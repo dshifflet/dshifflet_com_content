@@ -1,0 +1,74 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">Code This, Not That - Use Streams NOT FileInfo</h2>
+            <p class="blog-post-meta">
+				November 24, 2017 by <a href="../index.html">David Shifflet</a>
+			</p>
+			So let's say we want to read a file.  And for this example let's say this file contains some text seperated by commas like so...
+			<br/><br/>
+			<pre><code>1,2,3,4,5,6,7</code></pre>
+			<br/>
+			And one might write something along the lines of...
+			
+			<pre><code>
+public class ThatReadCsvFile
+{
+	public string[] ReadFile(FileInfo file)
+	{
+		using (var sr = new StreamReader(file.OpenRead()))
+		{
+			var s = sr.ReadLine();
+			while (s != null)
+			{
+				return s.Split(',');
+			}
+		}
+		return new string[] { };
+	}        
+}</code></pre>
+			The problem with this code is you can only use it with Files.  What if you want to use it with streams?  Like maybe in a test using a memory stream?
+<a name="endsummary"/>		
+			<br/><br/>
+			Instead Code This...
+			<br/>
+			<pre><code>
+public class ThisReadCsvFile
+{
+	public string[] ReadFile(FileInfo file)
+	{
+		using (var fileStream = file.OpenRead())
+		{
+			return ReadStream(fileStream);
+		}
+	}
+
+	public string[] ReadStream(Stream stream)
+	{
+		using (var sr = new StreamReader(stream))
+		{
+			while (sr.Peek()>=0)
+			{
+				return sr.ReadLine().Split(',');
+			}
+		}
+		return new string[] { };
+	}
+}</pre></code>
+			<br/>
+			So ReadFile can take a FileInfo or a Stream and we can do something like...
+			<pre><code>
+[TestMethod]
+public void CanThisReadCsvFile()
+{
+	//WE CAN DO...
+	var file = new FileInfo("sample.csv");
+	var reader = new ThisReadCsvFile();
+	Assert.IsTrue(reader.ReadFile(file).Length==7);
+	//OR
+	Assert.IsTrue(reader.ReadStream(
+		new MemoryStream(Encoding.UTF8.GetBytes("1,2,3,4,5"))).Length == 5);
+}</code></pre>							
+
+
+			<div id="disqus_thread" data-disqus-identifier="20171124"></div>		
+
+		  </div> <!-- /.blog-post -->

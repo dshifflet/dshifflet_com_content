@@ -1,0 +1,40 @@
+<!-- #TITLE NO WHERE IN THE BOOK DOES IT STATE THAT THE WHOLE POINT OF WRITING THESE TESTS IS TO ENSURE THAT THE SOFTWARE WORKS. -->
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">The Art of Unit Testing: with examples in C #</h2>
+            <p class="blog-post-meta">
+				December 11, 2017 by <a href="../index.html">David Shifflet</a>
+			</p>
+			<table>
+<tr>
+	<td style="vertical-align:top;">
+<a target="_blank"  href="https://www.amazon.com/gp/product/1617290890/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=1617290890&linkCode=as2&tag=dshifflet-20&linkId=2cd86ac46134bc8ddd91b46401ed209b"><img border="0" src="//ws-na.amazon-adsystem.com/widgets/q?_encoding=UTF8&MarketPlace=US&ASIN=1617290890&ServiceVersion=20070822&ID=AsinImage&WS=1&Format=_SL250_&tag=dshifflet-20" ></a><img src="//ir-na.amazon-adsystem.com/e/ir?t=dshifflet-20&l=am2&o=1&a=1617290890" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />	
+	</td>
+	<td style="vertical-align:top;">
+<a target="_blank" href="https://www.amazon.com/gp/product/1617290890/ref=as_li_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=1617290890&linkCode=as2&tag=dshifflet-20&linkId=d40f14b3b3edbda2d4585bb1b2487819">The Art of Unit Testing: with examples in C</a><img src="//ir-na.amazon-adsystem.com/e/ir?t=dshifflet-20&l=am2&o=1&a=1617290890" width="1" height="1" border="0" alt="" style="border:none !important; margin:0px !important;" />	
+			<br/><b>Review:</b><br/>			
+This is not a bad book.  If you knew nothing about writing automated tests, this book would OPEN your eyes. You will learn about fakes and mocks.  It doesn't go into the Moq framework very much. :(<br/><br/>
+That said this book has problems.<br/><br/>
+<a name="endsummary"/><!--</span></td></tr></table>-->
+NO WHERE IN THE BOOK DOES IT STATE THAT THE WHOLE POINT OF WRITING THESE TESTS IS TO ENSURE THAT THE SOFTWARE WORKS.<br/>That is pretty obvious, but no where does it state this.</br>
+That is the ENTIRE POINT OF HAVING AUTOMATED TESTS!!!<br/><br/>
+That said the focus is on unit tests.  Unit tests are great...  But...<br/><br/>
+Do not write tests for the sake of writing tests, that will get you NO WHERE!<br/><br/>
+<b>WHAT IS A UNIT TEST?</b><br/>
+If you want to create a great internet debate on reddit or any other forum...  Ask "What is the difference between a unit test and an integration test?".  Don your internet flame suit.<br/><br/>
+I got tired of debating around this.  I don't care what kind of test it is.  The tests need to make sure the software works.  So now I got fast tests and slow tests.  Which ones are they unit or integration?  I don't care.  Make everything green before releasing the thing.<br/><br/><b>MAKE SURE THE SOFTWARE WORKS <i>(THAT IS WHAT IS IMPORTANT)</i></b><br/><br/>
+<b>The problem with Unit Tests</b><br/>
+Using the googley definition they are small and test amounts of code with no external dependencies.<br/><br/>
+So maybe an AddTwoNumbers(int x, int y)...<br/><br/>
+Testing that is great, you can do 90% code coverage of everything via unit tests...  What happens when they are intergrated together?  Do they still work?  Do you meet your acceptance criteria?<br/><br/>
+KNOWING HOW CODE EXECUTES IN ISOLATION IS ONE THING, KNOWING HOW IT WORKS WITH OTHER CODE IS SOMETHING ELSE<br/><br/>
+You need to write tests for all paths.  YES, this includes the database.  From my own experience <u><b>defects come out of things where there were no tests</u></b>.  That means Unit Tests, Integration, E2E tests.  What you call them doesn't matter you need tests to make sure the software works!<br/><br/>
+<b>HOW DO I GET BETTER AT WRITING TESTS...</b><br/><br/>
+By writing more tests.  Seriously.  Write more tests.  If you think something isn't testable...  Before refactoring it, walk away and think about it again.  Everything is testable.<br/><br/>
+Also try to make your tests repeatable!<br/><br/>
+	</td>
+</tr>	
+</table>		
+		
+			<div id="disqus_thread"></div>		
+
+		  </div> <!-- /.blog-post -->			

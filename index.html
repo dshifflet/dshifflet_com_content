@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-110160833-1"></script>
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+
+	  gtag('config', 'UA-110160833-1');
+	</script>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>David Shifflet</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="css/one-page-wonder.css" rel="stylesheet">
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+	<!-- JAVASCRIPT -->
+	<script src="gauges/no_jquery.js"></script> 
+	<script src="gauges/gauges.js"></script>
+	<script>
+
+		ready(function() {		
+			var flow = new gauges.gauge("FLOW",0,270,0,350,3, 
+			  new gauges.gaugeTitle("STREAM FLOW", "GPH"),
+			[ 
+				new gauges.gaugeTick(50,1,15,true),
+			  	new gauges.gaugeTick(25,1,10,false), 
+			  	new gauges.gaugeTick(5,1,5,false) 
+			],
+			[
+				new gauges.gaugeShade("white", 60,130,9),
+				new gauges.gaugeShade("green", 90,230,7),
+				new gauges.gaugeShade("red", 230,350,7)				
+			],
+			[
+				new gauges.gaugeNeedle(new gauges.needlePainters.lineNeedle(), "blue", 95, 2, 150),
+				new gauges.gaugeNeedle(new gauges.needlePainters.pointyNeedle(), "orange", 95, 2, 100),			
+				new gauges.gaugeNeedle(new gauges.needlePainters.longPointyNeedle(), "AntiqueWhite", 80, 2, 200),
+				new gauges.gaugeNeedle(new gauges.needlePainters.markerNeedle(), "yellow", 95, 35, 305),				
+			]);		
+			
+			flow.paint();		
+
+			//move the needles
+			animate(flow, 0, 50, 20, 125, 5);
+			animate(flow, 1, 50, 0, 350, 15);
+			animate(flow, 2, 50, 150, 250, 30);
+			animate(flow, 3, 50, 275, 305, 5);
+			
+		});
+		
+		animate = function(gauge, idx, refreshMs, start, end, totalTime) {			
+			var elapsed = 0;			
+			var direction = 1;
+			var animation = setInterval(function() {				
+				var elapsedSeconds = elapsed / 1000;
+				if(elapsedSeconds>totalTime) {
+					//Animation is done restart it...
+					elapsed = 0;
+					//stop it...  clearInterval(animation);
+					if(direction===1) {
+						direction = -1;
+					}
+					else {
+						direction = 1;
+					}
+				}			
+				var resolution = 0;
+				var value = 0;
+				
+				//makes it bouncy
+				if(direction===1){
+					resolution = (end - start) / totalTime;
+					value = start + resolution * elapsed/1000;
+				}
+				else {
+					resolution = (start - end) / totalTime;
+					value = end + resolution * elapsed/1000;
+				}
+											
+				gauge.needles[idx].value = value;
+				gauge.paint();
+				elapsed += refreshMs;				
+			}, refreshMs);		
+		};		
+	</script>	
+	
+	
+  </head>
+
+  <body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">David Shifflet</a>
+		<a class="nav-link" href="https://twitter.com/mrshifflet">
+			<i class="fa fa-twitter"></i>
+		</a>
+		<a class="nav-link" href="#">
+			<i class="fa fa-facebook-official"></i>
+		</a>
+		<a class="nav-link" href="https://www.youtube.com/channel/UCrebkrbvGbdKmNl6gCso2vw">
+			<i class="fa fa-youtube"></i>
+		</a>
+		<a class="nav-link" href="https://github.com/dshifflet">
+			<i class="fa fa-github"></i>
+		</a>		
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="#">Home
+                <span class="sr-only">(current)</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="about.html">About</a>
+            </li>			
+            <li class="nav-item">
+              <a class="nav-link" href="blog/index.html">Blog</a>
+            </li>			
+            <li class="nav-item">
+              <a class="nav-link" href="mailto:dshifflet@gmail.com?Subject=Contact dshifflet.com" target="_top">Contact</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <header class="masthead">
+      <div class="overlay">
+        <div class="container">
+          <h1 class="display-1 text-white">David Shifflet</h1>
+          <h2 class="display-3 text-white p-3">Better Solutions...</br>Awesome Outcomes</h2>
+		  <center>
+			<a class="btn btn-primary btn-lg" role="button" href="about.html">About Me</a>			
+			<a class="btn btn-primary btn-lg" role="button" href="blog/index.html">Blog</a>
+			<a class="btn btn-primary btn-lg" role="button" href="https://github.com/dshifflet">GitHub</a>
+			<a class="btn btn-primary btn-lg" role="button" href="#software">Software</a>
+		  </center>
+        </div>
+      </div>
+    </header>
+
+    <section id="software">
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 order-2">
+            <div class="p-5">
+              <img class="img-fluid rounded" src="imgs/sqlwrangler.png" alt="">
+            </div>
+          </div>
+          <div class="col-md-6 order-1">
+            <div class="p-5">
+              <h2 class="display-4">SqlWrangler</h2>
+              <p>
+				<ul>
+					<li>
+						Unlock the Power of SQL as a Developer. Save time write better code!
+					</li>
+					<li>
+						Run SQL, get the data in a grid
+					</li>				
+					<li>
+						Export the grid to
+						<ul>
+							<li>CSV</li>
+							<li>JSON</li>
+							<li>XML as a Serialized DataTable (so you can go off and use the serialized datatable somewhere else, without the DB)</li>
+							<li>Create Inserts for SqlLite.</li>
+							<li>Generate common C# code. Model, NH Mapping, ADO Materalizer (Hydrator)</li>
+						</ul>
+					</li>	
+				</ul>		
+				<center>
+					<a class="btn btn-primary" role="button" href="https://github.com/dshifflet/SqlWrangler">GitHub</a>	
+				</center>
+			  </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <div class="p-5">
+              <img class="img-fluid rounded" src="imgs/poker.png" alt="">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-5">
+              <h2 class="display-4">WebRTC Sprint Poker</h2>
+              <p>
+				Plan your sprints with Sprint Poker over WebRTC.
+				<center>
+					<a class="btn btn-primary" role="button" href="https://github.com/dshifflet/PeerJS_PlanningPoker">GitHub</a>
+					<a class="btn btn-primary" role="button" href="http://umd-sprintpoker.azurewebsites.net/">Demo</a>
+				</center>
+			  </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 order-2">
+            <div class="p-5">
+			              <!--<img class="img-fluid img-rounded" src="imgs/gauges.png" alt="">-->
+			  <div id="FLOW" class="img-fluid" style="height:250px;width:250px;background-color:black;color:white;" height="250" width="250"></div>
+            </div>
+          </div>
+          <div class="col-md-6 order-1">
+            <div class="p-5">
+              <h2 class="display-4">JavaScript Gauges</h2>
+              <p>
+				Create Gauges and Animate them via Javascript using the Canvas
+			  </p>
+			  <center>
+				<a class="btn btn-primary" role="button" href="https://github.com/dshifflet/JavaScriptGauges">GitHub</a>
+			  <center>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>	
+	
+    <section>
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <div class="p-5">
+              <img class="img-fluid img-thumbnail" src="imgs/razortemplate.png" alt="">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-5">
+              <h2 class="display-4">Razor Template Example</h2>
+              <p>
+				Stop using string replace with tokens.  Use Razor Templates.  This will show you how!
+				<center>
+					<a class="btn btn-primary" role="button" href="https://github.com/dshifflet/RazorTemplateExample">GitHub</a>
+				</center>
+			  </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>	
+	
+    <section>
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 order-2">
+            <div class="p-5">
+              <img class="img-fluid img-thumbnail" src="imgs/filelogger.png" alt="">
+            </div>
+          </div>
+          <div class="col-md-6 order-1">
+            <div class="p-5">
+              <h2 class="display-4">Temporary File Logger</h2>
+              <p>
+				Log Temporary Files somewhere else via POST and give them a Time To Live (TTL)
+				<ul>
+					<li>Service that allows you to POST files with a TTL. After a certain time the files go away.</li>
+					<li>Basic restful search</li>
+					<li>Basic UI</li>
+					<li>Client Code</li>
+				</ul>
+			  </p>
+			  <center>
+				<a class="btn btn-primary" role="button" href="https://github.com/dshifflet/FileLogger">GitHub</a>
+			  <center>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>	
+	
+    <!-- Footer -->
+    <footer class="py-5 bg-dark">
+	  <hr/>
+      <div class="container">
+        <p class="m-0 text-center text-white">&copy; 2017 David Shifflet</p>
+      </div>
+      <!-- /.container -->
+    </footer>
+
+    <!-- Bootstrap core JavaScript -->
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/popper/popper.min.js"></script>
+    <script src="vendor/bootstrap/js/bootstrap.min.js"></script>
+
+  </body>
+
+</html>

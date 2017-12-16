@@ -1,0 +1,84 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">Code This, Not That - Use Params</h2>
+            <p class="blog-post-meta">
+				November 25, 2017 by <a href="../index.html">David Shifflet</a>
+			</p>
+			So let's say we had animals and we wanted to write their sounds out to the console.
+			<br/><br/>
+			Let's start with a class like:
+			<br/><br/>
+<pre><code>public class Animal
+{
+	public string Sound { get; set; }
+}</code></pre>
+			And let's create a service to make an animal speak:
+<pre><code>public class ThatAnimalSpeakingService
+{
+	public void Speak(Animal animal)
+	{
+		Console.WriteLine(animal.Sound);
+	}
+}</code></pre>
+And now for a test with multiple animals...
+			
+<pre><code>[TestMethod]
+public void ThatMakeAnimalsSpeak()
+{
+	var cat = new Animal() { Sound = "meow"};
+	var dog = new Animal() { Sound = "woof" };
+	var fish = new Animal() { Sound = "bloop" };
+	
+	var svc = new ThatAnimalSpeakingService();
+	svc.Speak(cat);
+	svc.Speak(dog);
+	svc.Speak(fish);
+}</pre></code>			
+And that works we get:
+<pre><code>meow
+woof
+bloop</pre></code>
+The only problem is the service can only take one animal at a time.  What if we wanted to deal with one animal or an array of animals?
+<a name="endsummary"/>
+<br/></br>
+<a href="https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/params">Enter "params"</a>
+<br/></br>
+Let's create a new service:
+<pre><code>public class ThisAnimalSpeakingService
+{
+	public void Speak(params Animal[] animals)
+	{
+		foreach (var animal in animals)
+		{
+			Console.WriteLine(animal.Sound);
+		}
+	}
+}</pre></code>			
+<i>(We called them This and That because it's code THIS not THAT!)</i>
+Now we can do something in a test like:
+<pre><code>[TestMethod]
+public void ThisMakeAnimalsSpeak()
+{
+	var cat = new Animal() { Sound = "meow" };
+	var dog = new Animal() { Sound = "woof" };
+	var fish = new Animal() { Sound = "bloop" };
+
+	var svc = new ThisAnimalSpeakingService();
+	//We can still do...
+	svc.Speak(cat);
+
+	//We can now do...
+	svc.Speak(cat, dog, fish);
+
+	//and we can also do an array...
+	var arrayOfAnimals = new [] {cat, dog, fish};
+	svc.Speak(arrayOfAnimals);
+}
+</pre></code>			
+			A lot more flexibility with out a lot more code!  Instead of dealing with one thing, be able to deal with many things!
+			<br/><br/>
+			<a href="https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/params">Learn more about "params" by clicking here!</a>
+			<br/><br/>
+
+			<div id="disqus_thread" data-disqus-identifier="20171125"></div>		
+
+		  </div> <!-- /.blog-post -->		  
