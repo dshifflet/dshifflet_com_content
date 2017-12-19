@@ -1,0 +1,104 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">Code This, Not That - Organizing Your Projects</h2>
+            <p class="blog-post-meta">
+				December 19, 2017 by <a href="../index.html">David Shifflet</a>
+			</p>
+			<p>
+				One of the hardest things in doing anything is <b>getting started!</b>  It's the same way for writing software.  You open up Visual Studio and you are like, where do I begin?  Where do I put things?  How do I make my life easier?
+			</p>
+			<p>
+				Hopefully with this post I can make your life easier, not only for you, but for others that might want to work with your code.  Most of these ideas came from discussions with my good friend <a href='https://twitter.com/VKamabathula'>Vamsee Kamabathula</a> he taught me a lot about how to make writing software brain dead easy by following a fairly formulaic approach.  This initial project organization is one of those ideas.
+			</p>
+			<p>To begin let's talk about some stuff to keep in mind:
+				<ul>
+					<li>
+						Organizing your project helps in finding things.  Being able to find things is important if you want to read things.  This is pretty obvious but it needs to be said.  You write code once, but you read code a lot!
+					</li>
+					<li>
+						We write code to be read!  First impressions are important.  If someone can't figure out your code within 15 minutes (This is probably more like 2 minutes.) they will move on.  You might have the greatest code in the world but if no one can read it or understand it quickly...  They will move on.  The first thing a new reader will look for is an "entry point" into the code.  This could be via a tool, or it could be via tests.  Ninety percent of the time it won't be via your class libraries.  So, don't make the first impression overwhelming!
+					</li>				
+					<li>
+						Names should be descriptive, especially assembly names.  If I am looking at binaries and I see some DLL names for assemblies, I should be able to back track that to the code that generated those assemblies.
+					</li>
+					<li>
+						An organization should organize their code in a coherent and similar manner.  If I can read one thing quickly and understand, I should be able to open something I have never seen and understand the format, and be able to start reading the code.
+					</li>
+				</ul>
+			</p>
+			<p>
+				So in order to show you the way, let's show some wrong ways first.				
+			</p>
+			<h3>The First Wrong Way - The Letter Full of Glitter</h3>
+			<p>
+				Imagine if you got a letter in the mail full of glitter.  I believe this is called a glitter bomb.  You open the thing and glitter goes everywhere.  Structuring your project flat like this is really similar.
+				<br/><br/>
+				<img src="images/glitter_project.PNG"/>
+				<br/><br/>
+				So if we are looking for an entry point into this project?  Where is it?  We have somethings called ".Tests" but then we have four things that aren't test?  Is one a tool?  Obviously the thing has to deal with migrating accounting data.  Which one is the tool that actually migrates the data?  Chances are that would be a good entry point for us to figure out this code?
+			</p>
+<a name="endsummary"/>			
+			<p>
+				So the problem with this is, it's too flat.  There isn't really any organization we just have a bunch of projects all inside of one solution file.  Up top the collapse all folders button, it will do nothing here.  As for first impressions, seven projects isn't bad.  Imagine if there were one hundred!  
+			</p>
+			<p>
+				It still is a bad first impression, because I don't know what is what.  Where do I go?  Keep in mind the 15 minutes rule, most of those 15 minutes is going to be consumed by just finding the entry point, way before they ever look at the code and can understand or evaluate it.
+			</p>
+			<h3>The Second Wrong Way - Almost There, But Not Quite</h3>
+			<p>
+				<img src="images/glitter_project3.PNG">				
+				<br/><br/>
+				So this is better, but still we have a bunch of classes at the bottom?  I can at least see where the tests are. I can see there is a tool, which I think does the migration.  Is that the entry point? Does the collapse button help?  I want the simplest view so I can explore from there.<br/>
+				<img src="images/glitter_project2.PNG"></br>
+				Is this the simplest view? We still have stuff at the bottom.  It's at the bottom basically because of alphabetical ordering.  If I had 100 projects all named different, some starting with A and B, the view of this would be insane.  Maybe it makes sense to put all the class libraries into one folder?
+			</p>
+			<h3>Finally...  Main, Tests, Tools</h3>
+			<p>
+				Can we do better?  Can we make the intial impression not overwhelming?</br></br>
+				In cooking there is a term <a href="https://en.wikipedia.org/wiki/Mise_en_place">Mise en Place</a>, can we give everything its own place?<br/>
+				<img src="images/noglitter_project1.PNG"><br/><br/>
+				Can we collapse it, so we can drill down?<br/>
+				<img src="images/noglitter_collapsed.PNG"><br/>
+				WE CAN!<br/>
+				<br/>
+				And finally let's expand the tools project...<br/>
+				<img src="images/noglitter_readme.PNG"></br>
+				...and we see a readme.txt that says:<br/><br/>
+				<pre><code>
+VamseeSoft.AccountingMigrator<br/>
+Console Application that migrates from another application to the VamseeSoft Accounting Software
+				</pre></code>
+			</p>		
+			<h3>THE FORMULAIC APPROACH</h3>
+			<p>
+				<ul>
+					<li>When starting a project create a <b>"main"</b>, <b>"tests"</b>, and <b>"tools"</b> folder.  (I believe it was decided to call it main, because programmers love to argue about names for ever, so main was easiest and the class libraries inside of the main folder do represent the main 'heart' of the solution.  Meat, Classes, Brown Bear, and ImportantStuff those names weren't generic enough.</li>
+					<li>Name your assemblies like so <b>&lt;CompanyName&gt;.&lt;ProductGroup&gt;.&lt;WhatItDoes&gt;</b>  If you have no product group, then omit it.  Do this even for EXEs.  It's real tempting to name console apps with short names, but five years from now when someone is reviewing that directory they are going to wonder where it came from.  Company Name, Product Group...  Makes it SUPER OBVIOUS.<br/>
+					A better name for these assemblies would be <b>VamseeSoft.Accounting.GreatPlainsMigration</b> (Company, Product Group, WhatItDoes)
+					</li>					
+					<li>Put your <b>main class libraries</b> in the <b>"main"</b> folder</li>
+					<li>Put your <b>tests</b> in the <b>"tests"</b> folder.  Name them <b>&lt;AssemblyName&gt;.Tests</b></li>
+					<li>Put your <b>console apps, webapis or host services</b> into the <b>"tools"</b> folder (Your webapi project is using stuff from the main folder, but it isn't main, it is but a tool.  At some point it will be replaced.  Just like console apps were replaced with window apps, and window apps with web apps, but the meat of the project is in main.  You are just referencing those parts for your tool.)</li>
+					<li>Not everything needs a readme.txt, but every tool does.  The main entry point for understanding your code for people is going to be via the tools then the tests, keep in mind people that can't read code might want to use your tools.  A <b>readme</b> means they can understand what the wonderful code you did does, or is supposed to do.</li>
+					<li>
+						<p>
+						People reading your code, might not have visual studio.   It might be github, it might be stash.  Remember you have 15 minutes to make an impression.
+						</p>
+						<p>
+							<b>THIS IS IMPORTANT WHEN YOU CREATE A FOLDER IN VISUAL STUDIO.  IT IS LOGICAL, BE SURE TO CREATE A PHYSICAL FOLDER ON THE DRIVE.  MAKE SURE THAT STUFF IS ORGANIZED IN THOSE PHYSICAL FOLDERS OR THE GITHUB or STASH REPRESENTATION WON'T MATCH THE LOGICAL REPRESENTATION IN VISUAL STUDIO!  This drives a lot of people NUTS!  Myself included.</b>
+						</p>
+					</li>
+					<li>That person who wants to read your code, it might be you in a couple of years. It might be late at night at the worst time, and they are offering so much $$$ you can't turn it down.</li>
+				</ul>
+			</p>			
+			<p>
+			My friends and I have spent a lot of time thinking about how to make this a formulaic repeatable approach.  Feel free to do what you want or even improve on this.  We know this works.  We hope it works for you.  It should be a good point to get started.  If you find you need to refactor you got that going for you by having the seperation across your project.
+			</p>
+			<p>If you have any questions or ideas on how to improve this let me know via the comments</p>
+			<p>The important thing, is to get started.  <b>DO SOMETHING!</b>  Half of anything is better than all of nothing!</p>
+			<br/><br/>
+			<center>
+			<iframe width="560" height="315" src="https://www.youtube.com/embed/bZTWx2bftaw" frameborder="0" gesture="media" allow="encrypted-media" allowfullscreen></iframe>			
+			</center>
+			
+			<div id="disqus_thread" data-disqus-identifier="20171215"></div>		
+		  </div> <!-- /.blog-post -->
