@@ -1,0 +1,147 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">Oracle ODP.NET and .NET CORE</h2>
+            <p class="blog-post-meta">
+				March 4, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180304.html#disqus_thread"></a>
+			</p>
+<p>			
+For this example we are going to:
+<ul>
+	<li>Create a .Net Core Console Application (.NET Core can run on platforms other than Windows, like Linux!)</li>
+	<li>Use the ODP.NET Managed Data Access for .NET core and connect to an oracle database to get some data and display it in the console.</li>
+</ul>
+</p>
+<a name="endsummary"/>
+<h2>First - Get ODP.NET Managed Data Access Beta for .NET Core</h2>
+<p>
+Go here and download it:<br/>
+<a href="http://www.oracle.com/technetwork/topics/dotnet/downloads/odpnetcorebeta-4077982.html">http://www.oracle.com/technetwork/topics/dotnet/downloads/odpnetcorebeta-4077982.html</a><br/>
+<b>At some point this will be on Nuget so I would check there first</b>
+</p>
+<h2>Create the Console App</h2>
+Open up Visual Studio 2017 do the following:
+<p>Create a new project - Choose .NET Core - Select Console App.  For the name I used "OdpNetCoreExample"
+</p>
+<center><img src="images/20180304_4.png" width="75%" height="75%"/></center>
+<br/>
+<p>
+<i>If ODP.NET for .NET Core is not on Nuget, yet...</i><br/>
+In the solution's folder create a directory called assemblies.  Copy the Oracle.ManagedDataAccess.dll from the zip you downloaded from Oracle to this directory.
+</p>
+<center><img src="images/20180304_3.png"/></center>
+<p>
+Add a reference to that file.  (Click browse)
+</p>
+<p>
+Now we probably want to store our connection string in something other than the code.  
+</p>
+<p>
+In .Net core the configuration has changed.  We will need to add some nuget packages. So in the Package Manager Console run the following:<br/><br/>
+</p>
+<pre>install-package Microsoft.Extensions.Configuration.Json</pre><br/>
+<center><img src="images/20180304_5.png" width="75%" height="75%"></center>
+<i>(If you want to use XML and not Json, there is a similar one for XML I think it's called Microsoft.Extensions.Configuration.Xml)</i>
+</p>
+<p>
+We want to add a new file called "appSettings.json" to our project.  This is similar to the "app.config" from previous version.  In the properties for the file change the build action to "Content" and the Copy to Output Directory to "Always".
+<center><img src="images/20180304_2.png"/></center>
+</p>
+<p>
+Edit the "appSettings.json" file so it contains the connection string.  Make it look like:
+<code><pre>
+{
+  "ConnectionStrings": {
+    "NorthwindDb": "DATA SOURCE=TNS_DOCKER;USER ID=northwind;PASSWORD=northwind;enlist=dynamic;"
+  }
+}
+
+</pre></code>
+</p>
+<p>
+Before .NET core the apps would automatically load the app config files.  With .NET core we have to do that ourselves.  So open the Program.cs and make it look like.
+<code><pre>
+using System;
+using System.IO;
+using Microsoft.Extensions.Configuration;
+using Oracle.ManagedDataAccess;
+
+namespace OdpNetCoreExample
+{
+    class Program
+    {
+        public static IConfiguration Configuration { get; set; }
+
+        static void Main(string[] args)
+        {
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appSettings.json");
+            Configuration = builder.Build();
+            Console.WriteLine(Configuration.GetConnectionString("NorthwindDb"));
+        }
+    }
+}
+</pre></code>
+</p>
+<p>
+Now is a good time to make sure the config files are wired up.  Run the app and you should see the connection string in the output.
+</p>
+<p>
+Now we are going to create a method that connects to the database and gets a list of the categories.  So Add this method:
+<code><pre>
+        static void GetData(string connectionString)
+        {
+            using (var connection = new OracleConnection(connectionString))
+            {
+                connection.Open();
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "select category_name from northwind.categories";
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            Console.WriteLine(reader["category_name"]);
+                        }
+                    }
+                }
+                connection.Close();
+            }
+        }		
+</pre></code>
+</p>
+<p>
+Finally call the method from Main.
+<code><pre>
+        static void Main(string[] args)
+        {
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appSettings.json");
+            Configuration = builder.Build();
+            GetData(Configuration.GetConnectionString("NorthwindDb"));
+        }		
+</pre></code>
+</p>
+<h2>Run It</h2>
+<p>
+Run it and you should see a list of categories.
+<center>
+<img src="images/20180304_1.png"/>
+</center>
+</p>
+<h2>Summary</h2>
+<p>
+The only thing really different is the configuration files and the storing of the connection strings, which is a .NET Core thing.
+</p>
+<p>
+With ODP.NET everything is pretty much the same and very familiar.
+</p>
+<p>
+All of this code is available at <a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExample">David Shifflet's GitHub</a>.
+</p>
+			<br/><br/>
+
+			<div id="disqus_thread" data-disqus-identifier="20180304"></div>		
+
+		  </div> <!-- /.blog-post -->		  
