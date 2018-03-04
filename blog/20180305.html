@@ -1,0 +1,217 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">SqlWrangler Has New Features</h2>
+            <p class="blog-post-meta">
+				March 5, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180305.html#disqus_thread"></a>
+			</p>
+<p>	
+SqlWrangler is a SQL Client with some amazing features.  I added some new features recently and I wanted to give you all the details.
+<h2>New Features</h2>
+<ul>
+<li>Run some sql like "select * from northwind.products" and export C# models.  Now with EntityFramework mapping and Linq2DB mapping model generation!</li>
+<li>Open Excel Spreadsheets and run SQL against them, like they are a database! (Requires Microsoft Ace)</li>
+</ul>		
+<h2>EntityFramework and Linq2DBMapping Model Generation</h2>
+So open Sql Wrangler run some sql.
+<center><img src="images/20180305_1.png" height="95%" width="95%"/></center>
+<br/>
+Then click the <img src="images/20180305_2.png"/>...
+Walk thru the dialogs and you will get code back like:</p>
+<a name="endsummary"/>
+<code><pre>
+using System;
+using NHibernate.Mapping.ByCode.Conformist;
+
+namespace TODO
+{
+/*
+select * from northwind.products 
+*/
+
+	//MODEL
+	public class Products
+	{
+		//PRODUCTS
+		public int Id { get; set; } //PRODUCT_ID
+		public string ProductName { get; set; } //PRODUCT_NAME
+		public int SupplierId { get; set; } //SUPPLIER_ID
+		public int CategoryId { get; set; } //CATEGORY_ID
+		public string QuantityPerUnit { get; set; } //QUANTITY_PER_UNIT
+		public double UnitPrice { get; set; } //UNIT_PRICE
+		public int UnitsInStock { get; set; } //UNITS_IN_STOCK
+		public int UnitsOnOrder { get; set; } //UNITS_ON_ORDER
+		public int ReorderLevel { get; set; } //REORDER_LEVEL
+		public string Discontinued { get; set; } //DISCONTINUED
+	}
+
+
+	//NHIBERNATE MAPPING
+	internal class ProductsMapping : ClassMapping<Products>
+	{
+		public ProductsMapping()
+		{
+			//Schema("TODO");
+			Table("PRODUCTS");
+			Lazy(false);
+			Id(prop => prop.Id, map =>
+			{
+				map.Column("PRODUCT_ID");
+				//map.Generator(Generators.Sequence, gmap => gmap.Params(new {sequence = "DATA_FILE_ID_SEQ"}));
+			});
+			Property(prop => prop.ProductName, map => map.Column("PRODUCT_NAME"));
+			Property(prop => prop.SupplierId, map => map.Column("SUPPLIER_ID"));
+			Property(prop => prop.CategoryId, map => map.Column("CATEGORY_ID"));
+			Property(prop => prop.QuantityPerUnit, map => map.Column("QUANTITY_PER_UNIT"));
+			Property(prop => prop.UnitPrice, map => map.Column("UNIT_PRICE"));
+			Property(prop => prop.UnitsInStock, map => map.Column("UNITS_IN_STOCK"));
+			Property(prop => prop.UnitsOnOrder, map => map.Column("UNITS_ON_ORDER"));
+			Property(prop => prop.ReorderLevel, map => map.Column("REORDER_LEVEL"));
+			Property(prop => prop.Discontinued, map => map.Column("DISCONTINUED"));
+		}
+	}
+
+
+	//BASIC MATERIALIZER
+	private class MaterializerProducts
+	{
+		private Products Materialize(DbDataReader reader)
+		{
+			return new Products() {
+				Id = (int) reader["PRODUCT_ID"],
+				ProductName = reader["PRODUCT_NAME"] as string,
+				SupplierId = (int) reader["SUPPLIER_ID"],
+				CategoryId = (int) reader["CATEGORY_ID"],
+				QuantityPerUnit = reader["QUANTITY_PER_UNIT"] as string,
+				UnitPrice = (double) reader["UNIT_PRICE"],
+				UnitsInStock = (int) reader["UNITS_IN_STOCK"],
+				UnitsOnOrder = (int) reader["UNITS_ON_ORDER"],
+				ReorderLevel = (int) reader["REORDER_LEVEL"],
+				Discontinued = reader["DISCONTINUED"] as string,
+			};
+		}
+	}
+
+
+}
+
+
+/*****************************/
+/****   EntityFramework   ****/
+/*****************************/
+
+	//MODEL
+	[Table("PRODUCTS", Schema = "TODO")]
+	public class Products
+	{
+
+		[Key]
+		[Column("PRODUCT_ID")]
+		public int Id { get; set; }
+
+		[Column("PRODUCT_NAME")]
+		[Required]
+		[StringLength(40)]
+		public string ProductName { get; set; }
+
+		[Column("SUPPLIER_ID")]
+		public int SupplierId { get; set; }
+
+		[Column("CATEGORY_ID")]
+		public int CategoryId { get; set; }
+
+		[Column("QUANTITY_PER_UNIT")]
+		[StringLength(20)]
+		public string QuantityPerUnit { get; set; }
+
+		[Column("UNIT_PRICE")]
+		public double UnitPrice { get; set; }
+
+		[Column("UNITS_IN_STOCK")]
+		public int UnitsInStock { get; set; }
+
+		[Column("UNITS_ON_ORDER")]
+		public int UnitsOnOrder { get; set; }
+
+		[Column("REORDER_LEVEL")]
+		public int ReorderLevel { get; set; }
+
+		[Column("DISCONTINUED")]
+		[Required]
+		[StringLength(1)]
+		public string Discontinued { get; set; }
+	}
+
+
+/*****************************/
+/****      LINQ 2 DB      ****/
+/*****************************/
+
+
+	//MODEL
+	[Table("PRODUCTS", Schema = "TODO")]
+	public class Products
+	{
+
+		[PrimaryKey, Identity]
+		[Column(Name = "PRODUCT_ID"), NotNull]
+		public int Id { get; set; }
+
+		[Column(Name = "PRODUCT_NAME"), NotNull]
+		public string ProductName { get; set; }
+
+		[Column(Name = "SUPPLIER_ID"), NotNull]
+		public int SupplierId { get; set; }
+
+		[Column(Name = "CATEGORY_ID"), NotNull]
+		public int CategoryId { get; set; }
+
+		[Column(Name = "QUANTITY_PER_UNIT"), Nullable]
+		public string QuantityPerUnit { get; set; }
+
+		[Column(Name = "UNIT_PRICE"), NotNull]
+		public double UnitPrice { get; set; }
+
+		[Column(Name = "UNITS_IN_STOCK"), NotNull]
+		public int UnitsInStock { get; set; }
+
+		[Column(Name = "UNITS_ON_ORDER"), NotNull]
+		public int UnitsOnOrder { get; set; }
+
+		[Column(Name = "REORDER_LEVEL"), NotNull]
+		public int ReorderLevel { get; set; }
+
+		[Column(Name = "DISCONTINUED"), NotNull]
+		public string Discontinued { get; set; }
+	}
+</code></pre>
+<p>Just copy and paste what you need. <b>NO MORE POINTLESS TYPING</b><i>, Or less I guess.</i></p>
+<h2>Working with Excel</h2>
+<p>
+When you start SqlWrangler at the Login screen click the button in the lower left hand corner.<br/>
+<center><img src="images/20180305_3.png"/></center>
+Open up an excel file.  Hit "F1" (Function Key 1) to start a new query and type some SQL like...
+<code><pre>
+SELECT * FROM [4th Quarter FSC$] where statecode='CA'
+</code></pre>
+"4th Quarter FSC" is the name of my worksheet in my XLSX file.  And get back results like:</br>
+<center><img src="images/20180305_4.png"  height="75%" width="75%"/></center>
+</p>
+<p>
+This helps a lot cause I work with giant Excel spreadsheets regularly and trying to find data or manipulate it is tough in excel.  You can even generate models and mappings from the excel files!  You can even generate tables and inserts from the excel files, by clicking the Export to SQL Lite button!
+</p>
+<p>
+This feature requires the Microsoft Access Database Engine 2010 Redistributable to work with Excel files. You will need to install it.  The readme at GitHub has more details.
+</p>
+<h2>Summary</h2>
+<p>
+Get Sql Wrangler at <a href="https://github.com/dshifflet/SqlWrangler">David Shifflet's GitHub</a>
+</p>
+<p>
+<h3>
+<b>Read the README.</b> <b><u>IT IS AUTOCOMMIT!!!</u></b>
+</h3>
+</p>
+			<br/><br/>
+			<div id="disqus_thread" data-disqus-identifier="20180305"></div>
+
+		  </div> <!-- /.blog-post -->		  
