@@ -1,0 +1,246 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">.NET Core, Alternatives to EntityFramework with Oracle and Linq2DB</h2>
+            <p class="blog-post-meta">
+				March 14, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180314.html#disqus_thread"></a>
+			</p>
+<h2>Introduction</h2>
+<p><center>
+<a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExampleLinq2Db">Example Code Here</a>
+</center></p>
+<p>	
+.NET Core is great.  But if you are looking to use an ORM (Object Relational Mapper) you are kind of out of luck unless you want to use Entity Framework and there happens to be a provider for it.   Right now there is no EF Provider from Oracle, so to do true .NET core with Oracle, Entity Framework isn't going to work.
+</p>
+<p>
+It may be possible to get NHibernate kind of working with the ODP.NET Core drivers, but it's not officially supported.  So I wanted to look at what else is out there.
+</p>
+<p>
+Let's look at Linq2DB.  Which is available at <a href="https://github.com/linq2db/linq2db">Linq2DB on GitHub</a>.  What will this do for us?
+</p>
+<p>
+<hr/>
+<blockquote class="blockquote">
+LINQ to DB is the fastest LINQ database access library offering a simple, light, fast, and type-safe layer between your POCO objects and your database.
+<br/><br/>
+Architecturally it is one step above micro-ORMs like Dapper, Massive, or PetaPoco, in that you work with LINQ expressions, not with magic strings, while maintaining a thin abstraction layer between your code and the database. Your queries are checked by the C# compiler and allow for easy refactoring.
+<br/><br/>
+However, it's not as heavy as LINQ to SQL or Entity Framework. There is no change-tracking, so you have to manage that yourself, but on the positive side you get more control and faster access to your data.
+<br/><br/>
+In other words LINQ to DB is type-safe SQL.
+</blockquote>
+<hr/>
+</p>
+<a name="endsummary"/>
+<p>
+Type safe and agnostic SQL!  That means we can write the same LINQ queries and they are agnostic from the DB provider.  So we could do stuff for Oracle, and maybe in some of our tests use an In Memory Database like SQL Lite!  (This post only deals with Oracle, I will show you how to do the In Memory DB SQL tests in another one.)
+</p>
+<h2>Let's Do This</h2>
+<p>
+So building off the last example using .NET core (<a href="http://www.dshifflet.com/blog/20180304.html">Previous Example</a>).  We are going to want to do the following:
+<ul>
+<li>Create a domain project called Northwind</li>
+<li>In that project create a way to tell it about our database</li>
+<li>Use the Northwind project from our console app to get some data</li>
+</ul>
+</p>
+<p>So we create a new project called "Northwind" and we create a folder called Models.
+<center><img src="images/20180314_1.PNG"/></center>
+</p>
+<p>
+Then we use the nuget package manager to install the Linq2DB for core:
+<code><pre>
+Install-Package linq2db.core
+</code></pre>
+</p>
+<p>
+Now we need to create our models.  Using <a href="https://github.com/dshifflet/SqlWrangler/tree/master/SqlWrangler/SqlWrangler">SQL Wrangler</a> which supports generation of models with mapping attributes for Linq2DB we execute "select * from northwind.products", <a href="20180305.html">click generate C#</a>, and copy and paste the output into a new class called Products in the models folder.  (Look at the comments in the SQL Wrangler output, it is basically a block of code snippets.<br/>
+<code><pre>
+using LinqToDB.Mapping;
+
+namespace Northwind.Models
+{
+    [Table("PRODUCTS", Schema = "NORTHWIND")]
+    public class Product
+    {
+        [PrimaryKey, Identity]
+        [Column(Name = "PRODUCT_ID"), NotNull]
+        public int Id { get; set; }
+        
+        [Column(Name = "PRODUCT_NAME"), NotNull]
+        public string ProductName { get; set; }
+
+        [Column(Name = "SUPPLIER_ID"), NotNull]
+        public int SupplierId { get; set; }
+
+        [Column(Name = "CATEGORY_ID"), NotNull]
+        public int CategoryId { get; set; }
+
+        [Column(Name = "QUANTITY_PER_UNIT"), Nullable]
+        public string QuantityPerUnit { get; set; }
+
+        [Column(Name = "UNIT_PRICE"), NotNull]
+        public double UnitPrice { get; set; }
+
+        [Column(Name = "UNITS_IN_STOCK"), NotNull]
+        public int UnitsInStock { get; set; }
+
+        [Column(Name = "UNITS_ON_ORDER"), NotNull]
+        public int UnitsOnOrder { get; set; }
+
+        [Column(Name = "REORDER_LEVEL"), NotNull]
+        public int ReorderLevel { get; set; }
+
+        [Column(Name = "DISCONTINUED"), NotNull]
+        public string Discontinued { get; set; }
+    }
+}
+</code></pre>
+Next we need to create some way to tell Linq2DB where our database is!  We want to create a class for our DbSettings.cs, to specify connection string and what provider to use.  We also want a Startup.cs so we can start the "domain" up and start working with it.<br/><br/>
+Our DbSettings.cs:
+<code><pre>
+using System.Collections.Generic;
+using LinqToDB.Configuration;
+
+namespace Northwind
+{
+    public class ConnectionStringSettings : IConnectionStringSettings
+    {
+        public string ConnectionString { get; set; }
+        public string Name { get; set; }
+        public string ProviderName { get; set; }
+        public bool IsGlobal => false;
+    }
+
+    public class NorthWindDbSettings : ILinqToDBSettings
+    {
+        public IEnumerable<IDataProviderSettings> DataProviders
+        {
+            get { yield break; }
+        }
+
+        public string DefaultConfiguration => "Oracle.Managed";
+        public string DefaultDataProvider => "Oracle.Managed";
+
+        public string ConnectionString { get; set; }
+
+        public NorthWindDbSettings(string connectionString)
+        {
+            ConnectionString = connectionString;
+        }
+
+        public IEnumerable<IConnectionStringSettings> ConnectionStrings
+        {
+            get
+            {
+                yield return
+                    new ConnectionStringSettings
+                    {
+                        Name = "Northwind",
+                        ProviderName = "Oracle.Managed",
+                        ConnectionString = ConnectionString
+                    };
+            }
+        }
+    }
+}
+</code></pre>
+Our Startup<br/>
+<code><pre>
+using LinqToDB;
+using LinqToDB.Data;
+using Northwind.Models;
+
+namespace Northwind
+{
+    public static class DbNorthwindStartup
+    {
+        private static bool _started;
+        public static void Init(string connectionString)
+        {
+            if (!_started)
+            {
+                DataConnection.DefaultSettings = new NorthWindDbSettings(connectionString);
+                _started = true;
+            }
+        }
+    }
+
+    public class DbNorthwind : DataConnection
+    {
+        public DbNorthwind() : base("Northwind") { }
+
+        //Register our mappings
+        public ITable<Product> Product => GetTable<Product>();
+
+        // ... other tables ...
+    }
+}
+</code></pre>
+So now we can just use Northwind.DbNorthwindStartup with a connection string, and we can start using it!  How does this work from the Console Application?
+<br/><br/>
+From Program.cs:
+<code><pre>
+using System;
+using System.IO;
+using System.Linq;
+using Microsoft.Extensions.Configuration;
+using Northwind;
+
+namespace OdpNetCoreExample
+{
+    class Program
+    {
+        public static IConfiguration Configuration { get; set; }
+
+        static void Main(string[] args)
+        {
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appSettings.json");
+
+            Configuration = builder.Build();
+
+            DbNorthwindStartup.Init(Configuration.GetConnectionString("NorthwindDb"));
+
+            GetData();
+        }
+
+        static void GetData()
+        {
+            using (var db = new DbNorthwind())
+            {
+                var query = db.Product.Where(o => o.Id > 25).OrderByDescending(o=>o.ProductName)
+                    .ToList();
+
+                foreach (var item in query.ToList())
+                {
+                    Console.WriteLine(item.ProductName);
+                }
+            }
+        }
+    }
+}
+</code></pre>
+</p>
+<p>And running the console application now should yield:
+<img src="images/20180314_2.png">
+</p>
+<h2>Why do this instead of just Dapper?</h2>
+<p>Because instead of SQL you are writing LINQ queries and you are abstracted away from the DB layer.  So instead of writing...
+<code><pre>
+	select * from northwind.product where product_id>25 order by product_name
+</code></pre>
+WRITE...
+<code><pre>
+	var query = db.Product.Where(o => o.Id > 25).OrderByDescending(o=>o.ProductName)
+		.ToList();
+</code></pre>
+There are benefits to this.  I will highlight them in a future blog post.  But the main one is, instead of pointing your tests at Oracle you can point them at something like In Memory SQL Lite.
+</p>
+<p><center>
+<a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExampleLinq2Db">Example Code Here</a>
+</center></p>
+			<br/><br/>
+			<div id="disqus_thread" data-disqus-identifier="20180314"></div>
+
+		  </div> <!-- /.blog-post -->		  
