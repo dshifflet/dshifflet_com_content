@@ -1,0 +1,368 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">.NET Core, Oracle, Linq2Db, Sqlite and In Memory Database Tests</h2>
+            <p class="blog-post-meta">
+				March 17, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180317.html#disqus_thread"></a>
+			</p>
+<h2>Introduction</h2>
+<p><center>
+<a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExampleLinq2DbWithTests">Example Code Here</a>
+</center></p>
+<p>	
+So in the <a href="http://www.dshifflet.com/blog/20180314.html">last example</a> we created a .NET Core project that connected to an Oracle database and displayed a list of products from Northwind.  For this example we are going to write some tests to make sure our Linq2Db is working
+</p>
+<p>
+Our goal here is to:
+<ul>
+<li>Use an In Memory Database that mirrors our Oracle database so it's fast. We are going to use Sqlite.  The queries are agnostic in regards to the database engine, so in theory the ones for Oracle should work with Sqlite and vice versa.</li>
+<li>Use xUnit</li>
+<li>Test that the linq queries from Linq2Db actually work</li>
+</ul>
+<p>
+Let's get started!
+</p>
+<a name="endsummary"/>
+<h2>Getting Ready</h2>
+<p>
+We are going to use <a href="https://www.sqlite.org/index.html">Sqlite</a> as our database engine.  The database will be stored in memory.  That means we are going to need a build or DDL script to create the database objects for us.
+</p>
+<p>
+We could create this from scratch, but using <a href="https://github.com/dshifflet/SqlWrangler">SqlWrangler</a> is a lot faster.
+</p>
+<p>
+First connect to your database using SQL Wrangler.  Execute the following sql:
+<code><pre>
+select * from northwind.products
+</code></pre>
+Some rows will return.  Now click the button <img src="images/20180317/1.png"/ alt="Export to SQLite"> button.
+<br/><br/>
+A window will appear.
+<br/><br/>
+<img src="images/20180317/2.png"/>
+<br/><br/>
+Type a schema name and a table name, and check both boxes.  We want to create tables and insert data into them.  Finally click OK and save the file somewhere.  Open that file, it will look like:
+<code><pre>
+/* CREATE TABLE northwind_products */
+create table northwind_products (
+PRODUCT_ID INT NOT NULL,
+PRODUCT_NAME VARCHAR(40) NOT NULL,
+SUPPLIER_ID INT NOT NULL,
+CATEGORY_ID INT NOT NULL,
+QUANTITY_PER_UNIT VARCHAR(20),
+UNIT_PRICE FLOAT NOT NULL,
+UNITS_IN_STOCK INT NOT NULL,
+UNITS_ON_ORDER INT NOT NULL,
+REORDER_LEVEL INT NOT NULL,
+DISCONTINUED VARCHAR(1) NOT NULL
+);
+
+/* INSERT TABLE northwind_products */
+insert into northwind_products (PRODUCT_ID, PRODUCT_NAME, SUPPLIER_ID, CATEGORY_ID, QUANTITY_PER_UNIT, UNIT_PRICE, UNITS_IN_STOCK, UNITS_ON_ORDER, REORDER_LEVEL, DISCONTINUED) values (1, 'Chai', 1, 1, '10 boxes x 20 bags', 18, 39, 0, 10, 'N');
+insert into northwind_products (PRODUCT_ID, PRODUCT_NAME, SUPPLIER_ID, CATEGORY_ID, QUANTITY_PER_UNIT, UNIT_PRICE, UNITS_IN_STOCK, UNITS_ON_ORDER, REORDER_LEVEL, DISCONTINUED) values (2, 'Chang', 1, 1, '24 - 12 oz bottles', 19, 17, 40, 25, 'N');
+insert into northwind_products (PRODUCT_ID, PRODUCT_NAME, SUPPLIER_ID, CATEGORY_ID, QUANTITY_PER_UNIT, UNIT_PRICE, UNITS_IN_STOCK, UNITS_ON_ORDER, REORDER_LEVEL, DISCONTINUED) values (76, 'Lakkalik??ri', 23, 1, '500 ml', 18, 57, 0, 20, 'N');
+insert into northwind_products (PRODUCT_ID, PRODUCT_NAME, SUPPLIER_ID, CATEGORY_ID, QUANTITY_PER_UNIT, UNIT_PRICE, UNITS_IN_STOCK, UNITS_ON_ORDER, REORDER_LEVEL, DISCONTINUED) values (77, 'Original Frankfurter gr?ne So?e', 12, 2, '12 boxes', 13, 32, 0, 15, 'N');
+</code></pre>
+</p>
+<p>
+Keep in mind SQLite doesn't have the concept of schemas.  So to mirror that functionality we are using <b>[SCHEMANAME]_[TABLENAME]</b>.  So <b>NORTHWIND.PRODUCTS</b> becomes <b>NORTHWIND_PRODUCTS</b>.  This will cause some problems later on, but nothing major.
+</p>
+<h2>To the Code</h2>
+<p>
+Armed with our build script it's time to write some code!
+</p>
+<p>Open up the previous project and add a new Tests project<br/>
+<center><img src="images/20180317/3.png"/></center>
+</p>
+<p>I renamed the default <b>UnitTests1.cs</b> to <b>BasicTests.cs</b>.  We are going to need to install a package to talk to Sqlite, so using the PackageManagerConsole run:
+<code><pre>
+install-package Microsoft.Data.Sqlite
+</code></pre>
+Be sure to add it to the Tests project (The drop down in the PackageManagerConsole)!  The other projects won't need it.
+</p>
+<p>The code we are going to add is
+<ul>
+<li>Our Database Build Script (SQL)</li>
+<li>A Fixture to share our database across our tests using xUnit</li>
+<li>The Tests</li>
+<li>A DbSettings for Sqlite and Linq2Db</li>
+<li>A Setup that populates our database with tables and data</li>
+</ul>
+</p>
+<h2>Our Database Build Script (SQL)</h2>
+<p>Now let's add our build script by creating a new text document call it "build_northwind.sql" and copy and paste the output from the SqlWrangler output into it.  Be sure to set the "Copy To Output Directory" to "Copy Always".
+</p>
+<h2>A Fixture to share our database across our tests using xUnit</h2>
+<p>Our tests are going to need to share the database so we will need a fixture for the xUnit tests.  So let's create one.
+<code><pre>
+using System;
+
+namespace Northwind.Tests
+{
+    public class NorthwindDbFixture : IDisposable
+    {
+        public NorthwindSetup Setup { get; }
+
+        public NorthwindDbFixture()
+        {
+            //DataSource=:memory: makes Sqlite use in memory
+            DbNorthwindStartup.Init(new SqliteDbSettings("Data Source=:memory:;"));
+            //Let's run this which will create our database and change our mapping names
+            Setup = new NorthwindSetup("build_northwind.sql", "Northwind.Models");
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+}
+</code></pre>
+This may seem strange.  I explain why we need this and how it works later on.
+</p>
+
+<h2>The Tests</h2>
+<p>Now in our BasicTests.cs let's write some tests!
+<code><pre>
+using System.Linq;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Northwind.Tests
+{
+    public class BasicTests : IClassFixture<NorthwindDbFixture>
+    {
+        private readonly NorthwindSetup _setup;
+
+        //this is to display some output about the counts
+        private readonly ITestOutputHelper _output;
+
+        public BasicTests(ITestOutputHelper output, NorthwindDbFixture fixture)
+        {
+            _setup = fixture.Setup;
+            _output = output;
+        }
+
+        [Fact]
+        public void CanGetProductsViaLinq()
+        {
+            using (var db = _setup.GetDbNorthwind())
+            {
+                var query = db.Product.Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
+                    .ToList();
+                _output.WriteLine("Products: {0}", query.Count);
+                Assert.True(query.Any());
+            }
+        }
+
+        [Fact]
+        public void CanGetCheapProductsViaLinq()
+        {
+            using (var db = _setup.GetDbNorthwind())
+            {
+                var query = db.Product.Where(o => o.UnitPrice < 20).OrderByDescending(o => o.ProductName)
+                    .ToList();
+                Assert.True(query.Any());
+            }
+        }
+    }
+}
+
+</code></pre>
+</p>
+<h3>Why the Fixture?  Why ITestOutputHelper?</h3>
+<p>
+Using the fixture will maintain the value of the _setup variable across the tests.  Basically every time a test runs in xUnit it will instantiate a new class (call the constructor) then call the individual test.  By implementing <b>IClassFixture<NorthwindDbFixture></b> and having a parameter in the constructor, <b>public BasicTests(NorthwindDbFixture fixture)</b>, xUnit is smart enough to call the constructor with that fixture.  The constructor then passes it to a local variable so the tests can access it.  
+</p>
+<p>
+The <b>ITestOutputHelper</b> let's us display some output to test results by doing <b>_output.WriteLine("Products: {0}", query.Count);</b>
+</p>
+
+<h2>A DbSettings for Sqlite and Linq2Db</h2>
+<p>
+Now let's create a DbSettings for our Sqlite database so Linq2Db can talk to it.
+<code><pre>
+using System.Collections.Generic;
+using LinqToDB.Configuration;
+
+namespace Northwind.Tests
+{
+    public class ConnectionStringSettings : IConnectionStringSettings
+    {
+        public string ConnectionString { get; set; }
+        public string Name { get; set; }
+        public string ProviderName { get; set; }
+        public bool IsGlobal => false;
+    }
+
+    public class SqliteDbSettings : ILinqToDBSettings
+    {
+        public IEnumerable<IDataProviderSettings> DataProviders
+        {
+            get { yield break; }
+        }
+
+        public string DefaultConfiguration => "Microsoft.Data.Sqlite";
+        public string DefaultDataProvider => "Microsoft.Data.Sqlite";
+
+        public string ConnectionString { get; set; }
+
+        public SqliteDbSettings(string connectionString)
+        {
+            ConnectionString = connectionString;
+        }
+
+        public IEnumerable<IConnectionStringSettings> ConnectionStrings
+        {
+            get
+            {
+                yield return
+                    new ConnectionStringSettings
+                    {
+                        Name = "Northwind",
+                        ProviderName = "Microsoft.Data.Sqlite",
+                        ConnectionString = ConnectionString
+                    };
+            }
+        }
+    }
+}
+</code></pre>
+This looks a lot like our DbSettings in the Northwind project for Oracle.  The only real change is the provider is now Microsoft.Data.Sqlite.
+</p>
+<p>
+Our code is using this DbSettings code in the NorthwindDbFixture.
+<code><pre>
+DbNorthwindStartup.Init(new SqliteDbSettings("Data Source=:memory:;"));
+</code></pre>
+<h2>A Setup that populates our database with tables and data</h2>
+<p>
+Next we are going to need something that builds up our database with tables and data so let's create a Setup for that!
+<code><pre>
+using System;
+using System.IO;
+using System.Linq;
+using LinqToDB.Data;
+using LinqToDB.Mapping;
+
+namespace Northwind.Tests
+{
+    public class NorthwindSetup
+    {
+        private readonly string[] _nameSpaces;
+        private bool _namesChanged;
+        private readonly string[] _buildCommands;
+        
+        public NorthwindSetup(string buildFile, params string[] nameSpaces)
+        {
+            if (buildFile == null) throw new ArgumentNullException(nameof(buildFile));
+            if (!File.Exists(buildFile)) throw new FileNotFoundException(
+                string.Format("Unable to find '{0}'", buildFile));
+            
+            _nameSpaces = nameSpaces ?? throw new ArgumentNullException(nameof(nameSpaces));
+
+            using (var sr = new StreamReader(buildFile))
+            {
+                var s = sr.ReadToEnd();
+                _buildCommands = s.Split(';');
+            }
+        }
+        
+        public DbNorthwind GetDbNorthwind()
+        {
+            var db = new DbNorthwind();
+            
+            //Have to change our table names because Linq2Db for Sqlite doesn't use the schema name
+            ChangeTableNames(db, _nameSpaces);
+
+            //build up the database from our script
+            foreach (var cmd in _buildCommands)
+            {
+                db.Execute(cmd);
+            }
+            return db;
+        }
+
+        private void ChangeTableNames(DataConnection db, string[] nameSpaces)
+        {
+            //What this does?
+            //Given a namespace look for classes we have registered with Linq2Db
+            //and change the table name to schema_tablename.
+            
+            //Only do it once
+            if (_namesChanged) return;
+            _namesChanged = true;
+
+            //get the classes in the namespaces
+            foreach (var item in AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(t => t.GetTypes())
+                .Where(t => t.IsClass && nameSpaces.Contains(t.Namespace)))
+            {
+                var descriptor = db.MappingSchema.GetEntityDescriptor(item);
+                if (descriptor.SchemaName != null)
+                {
+                    //The reflection is here to deal with the generic methods.
+                    var builder = db.MappingSchema.GetFluentMappingBuilder();
+                    var method = typeof(FluentMappingBuilder).GetMethod("Entity");
+                    var genericMethod = method.MakeGenericMethod(item);
+                    var entityBuilder = genericMethod.Invoke(builder, new object[] { null });
+                    var tblMethod = entityBuilder.GetType().GetMethod("HasTableName");                   
+                    tblMethod.Invoke(entityBuilder, new object[] {
+                        string.Format("{0}_{1}", descriptor.SchemaName, descriptor.TableName)});
+                }
+            }
+        }
+    }
+}
+</code></pre>
+See that <b>ChangeTableNames()</b> method at the end.  We need that because Linq2Db basically ignores the schema name when using Sqlite.  
+</p>
+<p>Linq2Db with SqlLite when executing <b>db.Product.Where(o => o.UnitPrice < 20)</b> is going to execute <b>select * from products where...</b>.  Remember our table is called <b>NORTHWIND_PRODUCTS</b> to accomodate the idea of schemas.
+<p>
+So we are changing the table names in the mappings to follow our format of <b>[SCHEMANAME]_[TABLENAME]</b>.  The lines of reflection are needed because of the generic functions.  This way we execute <b>select * from northwind_products where...</b> when we execute our queries.
+</p>
+<p>
+We want it to work for all the db mapped classes so we don't have to specify them.  So any class in a namespace we specified that is mapped with Linq2Db, it will change the table names for us automatically.  It discovers them and changes them for us.
+</p>
+<p>
+If you wanted to you could specify them by hand by doing something like:
+<code><pre>
+db.MappingSchema.GetFluentMappingBuilder().Entity<Product>().HasTableName("NORTHWIND_PRODUCTS");
+</code></pre>
+<p>Also it is important not to call the ChangeNames more than once.  It's kind of expensive that is why this is there.
+<code><pre>
+            //Only do it once
+            if (_namesChanged) return;
+            _namesChanged = true;
+</code></pre>
+</p>
+<p>Although we are changing the names once.  The database is being recreated for every test!  So keep this in mind.  The database goes away when the connection is closed or disposed. See the end of that using statement... It goes away at that point.
+<code><pre>
+		using (var db = _setup.GetDbNorthwind())
+		{
+			var query = db.Product.Where(o => o.UnitPrice < 20).OrderByDescending(o => o.ProductName)
+				.ToList();
+			Assert.True(query.Any());			
+		}
+		//No more database because connection is disposed!
+</code></pre>
+<p>
+Finally this setup is called in the NorthwindDbFixture.
+<code><pre>
+Setup = new NorthwindSetup("build_northwind.sql", "Northwind.Models");
+</code></pre>
+</p>
+<p>
+<h2>Summary</h2>
+And that is basically it.  Run the tests and they should pass and run fast!  The console application should also work.
+<ul>
+<li>We didn't change the Northwind project to test it all</li>
+<li>Using Linq2Db means our queries are database agnostic.  The same ones will work with Oracle or Sqlite.</li>
+<li>Keep in mind, the Sqlite DB is in memory, so when the connection is disposed it is disposed!</li>
+</ul>
+</p>
+<p><center>
+<a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExampleLinq2DbWithTests">Example Code Here</a>
+</center></p>
+			<br/><br/>
+			<div id="disqus_thread" data-disqus-identifier="20180317"></div>
+
+		  </div> <!-- /.blog-post -->		  
