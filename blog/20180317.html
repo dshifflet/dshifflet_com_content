@@ -38,7 +38,9 @@ Some rows will return.  Now click the button <img src="images/20180317/1.png"/ a
 <br/><br/>
 A window will appear.
 <br/><br/>
+<center>
 <img src="images/20180317/2.png"/>
+</center>
 <br/><br/>
 Type a schema name and a table name, and check both boxes.  We want to create tables and insert data into them.  Finally click OK and save the file somewhere.  Open that file, it will look like:
 <code><pre>
@@ -354,7 +356,7 @@ Setup = new NorthwindSetup("build_northwind.sql", "Northwind.Models");
 <h2>Summary</h2>
 And that is basically it.  Run the tests and they should pass and run fast!  The console application should also work.
 <ul>
-<li>We didn't change the Northwind project to test it all</li>
+<li>We didn't change the Northwind project to test it at all</li>
 <li>Using Linq2Db means our queries are database agnostic.  The same ones will work with Oracle or Sqlite.</li>
 <li>Keep in mind, the Sqlite DB is in memory, so when the connection is disposed it is disposed!</li>
 </ul>
