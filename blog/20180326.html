@@ -1,0 +1,478 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">.NET Core, Oracle and NHibernate</h2>
+            <p class="blog-post-meta">
+				March 26, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180326.html#disqus_thread"></a>
+			</p>
+			<p>
+			<center>
+				<a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExampleNhWithTests">Example Code Here</a><br/>			
+			</center>
+			</p>
+<h2>Introduction</h2>		
+<p>
+So NHibernate has been released with .NET Core support! <a href="http://nhibernate.info/blog/2018/03/17/nhibernate-5-1-released.html">NHibernate Announcement</a>
+</p>
+<p>
+Which means in theory we can use that as an ORM and combined with the .NET Core support from Oracle.ManagedDataAccess we can use it with Oracle Databases!
+</p>
+<p>
+So in this example, we will use the previous Linq2Db examples and move those over to NHibernate!  We will still maintain the Sqlite tests we had before.
+</p>
+<p>This example references and builds off stuff contained in <a href="http://www.dshifflet.com/blog/20180317.html">a previous example.</a>  When I am referring to Linq2Db I am referring to code in that example.
+</p>
+<a name="endsummary"/>
+<h2>Let's Change Northwind</h2>
+<p>
+So for our Northwind domain when using NHibernate we are going to want three basic sections:
+<ul>
+<li>Models: Our <b>.cs</b> Models
+<li>Mappings: How we map our models to the database</li>
+<li>A Factory: This will let us create the NHibernate Session Factory that will let us connect to our database.</li>
+</ul>
+And it's going to look like:<br/>
+<center>
+<img src="images/20180326/1.png"/>
+</center><br/>
+So using <a href="">Sql Wrangler</a> we are going to execute <b>select * from northwind.products</b> and generate some C# by clicking <img src="images/20180305_2.png"/>.  We are going to create a Product model in the Models folder, and a ProductMapping in the Mappings folder.  The content for these comes from the output of clicking <img src="images/20180305_2.png"/> in SqlWrangler.  It will look like:<br/><br/>
+Models\Product.cs  (Edit the name from Products to Product!)
+<code><pre>
+namespace Northwind.Models
+{
+    public class Product
+    {
+        //PRODUCTS
+        public int Id { get; set; } //PRODUCT_ID
+        public string ProductName { get; set; } //PRODUCT_NAME
+        public int SupplierId { get; set; } //SUPPLIER_ID
+        public int CategoryId { get; set; } //CATEGORY_ID
+        public string QuantityPerUnit { get; set; } //QUANTITY_PER_UNIT
+        public double UnitPrice { get; set; } //UNIT_PRICE
+        public int UnitsInStock { get; set; } //UNITS_IN_STOCK
+        public int UnitsOnOrder { get; set; } //UNITS_ON_ORDER
+        public int ReorderLevel { get; set; } //REORDER_LEVEL
+        public string Discontinued { get; set; } //DISCONTINUED
+    }
+}
+</code></pre>
+And then...<br/><br/>
+Mappings\ProductMapping.cs (Again edit the name from Products to Product, and add the schema NORTHWIND.)
+<code><pre>
+using NHibernate.Mapping.ByCode.Conformist;
+using Northwind.Models;
+
+namespace Northwind.Mappings
+{
+
+    //NHIBERNATE MAPPING
+    internal class ProductsMapping : ClassMapping<Product>
+    {
+        public ProductsMapping()
+        {
+            Schema("NORTHWIND");
+            Table("PRODUCTS");
+            Lazy(false);
+            Id(prop => prop.Id, map =>
+            {
+                map.Column("PRODUCT_ID");
+                //map.Generator(Generators.Sequence, gmap => gmap.Params(new {sequence = "PRODUCT_ID_SEQ"}));
+            });
+            Property(prop => prop.ProductName, map => map.Column("PRODUCT_NAME"));
+            Property(prop => prop.SupplierId, map => map.Column("SUPPLIER_ID"));
+            Property(prop => prop.CategoryId, map => map.Column("CATEGORY_ID"));
+            Property(prop => prop.QuantityPerUnit, map => map.Column("QUANTITY_PER_UNIT"));
+            Property(prop => prop.UnitPrice, map => map.Column("UNIT_PRICE"));
+            Property(prop => prop.UnitsInStock, map => map.Column("UNITS_IN_STOCK"));
+            Property(prop => prop.UnitsOnOrder, map => map.Column("UNITS_ON_ORDER"));
+            Property(prop => prop.ReorderLevel, map => map.Column("REORDER_LEVEL"));
+            Property(prop => prop.Discontinued, map => map.Column("DISCONTINUED"));
+        }
+    }
+}
+</code></pre>
+</p>
+<p>
+Finally for the Northwind project we need a static Factory to create the NHibernate SessionFactory!  Thus a file called NhFactory.cs:
+<code><pre>
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Reflection;
+using NHibernate;
+using NHibernate.Cache;
+using NHibernate.Cfg;
+using NHibernate.Cfg.MappingSchema;
+using NHibernate.Connection;
+using NHibernate.Dialect;
+using NHibernate.Driver;
+using NHibernate.Mapping.ByCode;
+
+namespace Northwind
+{
+    public static class NhFactory
+    {
+        public static HbmMapping[] HbmMappings { get; private set; }
+
+        public static ISessionFactory CreateNhSessionFactory<TDialect, TDriver>(string connectionString, Assembly[] assemblies = null, bool showSql = true) 
+            where TDialect : Dialect
+            where TDriver : IDriver
+        {
+            if (assemblies == null)
+            {
+                assemblies = new[] { Assembly.GetExecutingAssembly() };
+            }
+
+            var nhConfiguration = new Configuration();
+            nhConfiguration.Cache(properties => properties.Provider<HashtableCacheProvider>());
+
+            nhConfiguration.DataBaseIntegration(dbi =>
+            {
+                dbi.Dialect<TDialect>();
+                dbi.Driver<TDriver>();
+                dbi.ConnectionProvider<DriverConnectionProvider>();
+                dbi.IsolationLevel = IsolationLevel.ReadCommitted;
+                dbi.ConnectionString = connectionString;
+                dbi.Timeout = 60;
+                dbi.LogFormattedSql = true;
+                dbi.LogSqlInConsole = false;
+            });
+            if (showSql)
+            {
+                nhConfiguration.Properties["show_sql"] = "true";
+            }
+
+
+            if (HbmMappings == null || !HbmMappings.Any())
+            {
+                RegisterMappings(assemblies);
+            }
+            if (HbmMappings != null)
+            {
+                HbmMappings.ToList().ForEach(nhConfiguration.AddMapping);
+                var assembly = Assembly.GetExecutingAssembly();
+                nhConfiguration.AddAssembly(assembly);
+                var sessionFactory = nhConfiguration.BuildSessionFactory();
+                return sessionFactory;
+            }
+            throw new HibernateConfigException("Unable to find any mappings for NHibernate.");
+        }
+
+        public static void RegisterMappings(Assembly[] assemblies)
+        {
+            //Register things that are classes ending with Mapper and in the Mappings namespace
+            var mapper = new ModelMapper();
+            
+            foreach (Type t in GetMappings(assemblies))
+            {
+                var method = typeof(ModelMapper).GetMethods().FirstOrDefault(
+                        o => o.Name.Equals("AddMapping") &&
+                        o.GetParameters().Length == 0 &&
+                        o.ContainsGenericParameters
+                );
+
+                if (method == null)
+                {
+                    throw new InvalidOperationException("Could not retrieve AddMapping method");
+                }
+
+                method
+                    .MakeGenericMethod(t).Invoke(mapper, null);
+            }
+
+            var mappings = new List<ModelMapper>
+                           {
+                               mapper
+                           };
+            var hibernateMappings = mappings.Select(map =>
+            {
+                var hbm = map.CompileMappingForAllExplicitlyAddedEntities();
+                hbm.autoimport = false;
+                return hbm;
+            }).ToArray();
+            HbmMappings = hibernateMappings;
+        }
+
+        public static IEnumerable<Type> GetMappings(IEnumerable<Assembly> assemblies)
+        {
+            var result = new List<Type>();
+            foreach (var assembly in assemblies)
+            {
+                result.AddRange(assembly.GetTypes()
+                    .Where(o => o.Name.EndsWith("Mapping") && o.Namespace != null &&
+                                o.Namespace.EndsWith("Mappings"))
+                    .ToArray());
+            }
+            return result;
+        }
+    }
+}
+</code></pre>
+There are some things I want to point out here:
+<ul>
+<li>We don't want dependencies on a specific Database Implementation.  That is why we are using Generics when we construct the SessionFactory with <b>CreateNhSessionFactory<TDialect, TDriver>(string connectionString, Assembly[] assemblies = null, bool showSql = true)</b>
+</li>
+<li>
+We aren't hard coding what mappings we are using.  We are using reflection and discovering them, those that inherit the <b>ClassMapping</b> and are in a namespace called <b>*Mappings</b>.  This is what <b>RegisterMappings(...)</b> and <b>GetMappings(...)</b> is doing for us.
+</li>
+<li>
+<p>
+This factory is very generic, you can reuse it over and over again in future projects.  Remember no dependencies on the Database Implementation.</p>
+<p>
+In this example we have the models and mappings in the same project.  It makes more sense for actual real life code to separate them.  Have a Northwind.Models and a Northwind.DataAccess.  That way you don't need to change your models if you decide to use something else for data access.  Another benefit is if someone doesn't care about data access and only wants to use your models, less dependencies.  <u>Think... Separation of Concerns.</u>
+</p>
+</li>
+</ul>
+</p>
+<h2>Let's Make the Console App Work Again</h2>
+<p>
+Our console application which displays a list of products will need to be changed.  Those changes are going to look like this in Program.cs:  (I added extra comments to explain what is happening)
+<code><pre>
+using System;
+using System.IO;
+using System.Linq;
+using Microsoft.Extensions.Configuration;
+using NHibernate.Dialect;
+using NHibernate.Driver;
+using Northwind;
+using Northwind.Models;
+
+namespace OdpNetCoreExample
+{
+    class Program
+    {
+        public static IConfiguration Configuration { get; set; }
+
+        static void Main()
+        {
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appSettings.json");
+
+            Configuration = builder.Build();
+
+            GetData();
+        }
+
+        static void GetData()
+        {
+//Let's load a SessionFactory.  This includes the schemas and mappings.  And the database connection.
+//Notice how we are passing in the dialect and driver?  That means Northwind is Agnostic per
+//the Database engine.
+            using (var sessionFactory =
+                NhFactory.CreateNhSessionFactory<Oracle10gDialect, OracleManagedDataClientDriver>(Configuration.GetConnectionString("NorthwindDb")))
+            {
+//Now let's open the connection to the database and do some things.
+//Also we will create a transaction.  Transactions are important, even though this is readonly
+//what if someone else comes along and changes it?  Wrap stuff in transactions!
+                using (var session = sessionFactory.OpenSession())
+                using (var txn = session.BeginTransaction())
+                {
+//Our Linq2Db code has changed from
+//var query = db.Product.Where(o => o.Id > 25).OrderByDescending(o=>o.ProductName)  
+//.ToList();
+//to...
+                    var query = session.Query<Product>().Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
+                        .ToList();
+//So it's very similar.
+                    foreach (var item in query.ToList())
+                    {
+                        Console.WriteLine(item.ProductName);
+                    }
+//Finally we commit.  We don't need to commit cause at this point it's read only.  If we didn't commit the transaction would roll back.
+                    txn.Commit();
+                }
+            }
+        }
+    }
+}
+</code></pre>
+</p>
+<p>
+And that is pretty much it for the Console application.
+</p>
+<h2>Fixing the Tests</h2>
+<p>
+Our tests will get a bit simpler now.  A plus is NHibernate respects our schema naming with Sqlite aka <b>NORTHWIND.PRODUCTS</b> (from Oracle) is <b>NORTHWIND_PRODUCTS</b> (in Sqlite).
+<br/>
+<center>
+<img src="images/20180326/2.png"/>
+</center>
+</br>
+All we are going to need to do, is the following:
+<ul>
+<li>Change our NorthwindDbFixture to talk to NHibernate</li>
+<li>Modify our tests to use the new session</li>
+</ul>
+So some files like NorthwindSetup.cs and SqliteDbSettings.cs will go away!
+</p>
+<h3>NorthwindDbFixture.cs</h3>
+<p>
+Let's look at the NorthwindDbFixture.cs:
+<code><pre>
+using System;
+using System.IO;
+using NHibernate;
+using NHibernate.Dialect;
+
+namespace Northwind.Tests
+{
+    public class NorthwindDbFixture : IDisposable
+    {
+        public ISessionFactory SessionFactory { get; }
+        private readonly string[] _buildCommands;
+
+        public NorthwindDbFixture()
+        {
+            //DataSource=:memory: makes Sqlite use in memory     
+            SessionFactory = NhFactory.CreateNhSessionFactory<SQLiteDialect, MicrosoftDataSqliteDriver> ("DataSource=:memory:");
+
+            using (var sr = new StreamReader("build_northwind.sql"))
+            {
+                var s = sr.ReadToEnd();
+                _buildCommands = s.Split(';');
+            }
+        }
+
+        public ISession OpenSession()
+        {
+            var session = SessionFactory.OpenSession();
+            foreach (var sql in _buildCommands)
+            {
+                using (var cmd = session.Connection.CreateCommand())
+                {
+                    cmd.CommandText = sql;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            return session;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+}
+</code></pre>
+So what is happening here?<br/>
+<ul>
+<li>The constructor <b>NorthwindDbFixture()</b> is setting up our session factory so we can pass that down to our tests.  It's also reading and splitting our build script (DDL) into the <b>_buildCommands</b> array  so we can execute it later.</li>
+<li>The method <b>OpenSession()</b> is opening our connection and building our DBOs and inserting the test data for us from the SQL in the build script.  NHibernate can kind of execute raw sql, but if you need to do something interesting keep in mind you can get an IDbConnection from the <b>session.Connection</b>.  In fact if you need to do something super crazy you can actually cast it and use it that way like <b>var oracleCn = (OracleConnection) session.Connection</b> this is one way to side step Nhibernate when needed.  (e.g. OracleBulkCopy operations)
+</li>
+</ul>
+</p>
+<h3>MicrosoftDataSqliteDriver.cs</h3>
+<p>
+So NHibernate doesn't have a driver included in the nuget package for the Microsoft.Data.Sqlite.
+</p>
+<p>
+We need to create one!  Which is super easy.  I took the code from <b>NHibernate.Driver.CsharpSqliteDriver</b> and changed it for Microsoft.Data.Sqlite.
+</p>
+<p>
+MicrosoftDataSqliteDriver.cs
+<code><pre>
+using NHibernate;
+using NHibernate.Driver;
+
+namespace Northwind.Tests
+{
+    /// <summary>
+    /// NHibernate driver for the Community Microsoft.Data.Sqlite data provider.
+    /// </summary>
+    public class MicrosoftDataSqliteDriver : ReflectionBasedDriver
+    {
+        /// <summary>
+        /// Initializes a new instance of <see cref="Microsoft.Data.Sqlite"/>.
+        /// </summary>
+        /// <exception cref="HibernateException">
+        /// Thrown when the <c>Microsoft.Data.Sqlite</c> assembly can not be loaded.
+        /// </exception>
+        public MicrosoftDataSqliteDriver()
+            : base(
+                "Microsoft.Data.Sqlite",
+                "Microsoft.Data.Sqlite.SqliteConnection",
+                "Microsoft.Data.Sqlite.SqliteCommand")
+        {
+        }
+		
+        public override bool UseNamedPrefixInSql => true;
+        public override bool UseNamedPrefixInParameter => true;
+        public override string NamedPrefix => "@";
+        public override bool SupportsMultipleOpenReaders => false;
+    }
+}
+</code></pre>
+We are getting closer...
+</p>
+<h2>Finally the Tests</h2>
+<p>
+<code><pre>
+using System.Linq;
+using Northwind.Models;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Northwind.Tests
+{
+    public class BasicTests : IClassFixture<NorthwindDbFixture>
+    {
+        //this is to display some output about the counts
+        private readonly ITestOutputHelper _output;
+        private readonly NorthwindDbFixture _fixture;
+
+        public BasicTests(ITestOutputHelper output, NorthwindDbFixture fixture)
+        {
+            _output = output;
+            _fixture = fixture;
+        }
+
+        [Fact]
+        public void CanGetProductsViaLinq()
+        {
+            using(var session = _fixture.OpenSession())
+            {
+                var query = session.Query<Product>().Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
+                    .ToList();
+                _output.WriteLine("Products: {0}", query.Count);
+                Assert.True(query.Any());
+            }
+        }
+
+        [Fact]
+        public void CanGetCheapProductsViaLinq()
+        {
+            using (var session = _fixture.OpenSession())
+            {
+                var query = session.Query<Product>().Where(o => o.UnitPrice < 20).OrderByDescending(o => o.ProductName)
+                    .ToList();
+                Assert.True(query.Any());
+            }
+        }
+    }
+}
+</code></pre>
+</p>
+<p>
+So not a lot of changes here.  We are basically using the fixture directly instead of the Setup like in the Linq2Db example.
+</p>
+<p>
+Our basic querying has changed from <b>db.Product.Where(o => o.Id > 25)</b> in Linq2Db to <b>session.Query<Product>().Where(o => o.UnitPrice < 20)</b> with NHibernate.  The contents of the where remains the same.
+</p>
+<p>
+I am not using transactions here, because this is read only.  But maybe I should be?
+</p>
+<h2>Finally</h2>
+<p>At this point everything should build.  If you run the console app you should see the products.  If you run the tests those should pass.
+</p>
+<p>
+So with the new .Net Core support provided by Oracle.ManagedDataAccess and the new NHibernate with .Net Core support you can now create platform portable solutions that can use an ORM and work with the Oracle Database.  You should also be able to create tests using an in memory Sqlite Database to test your stuff.
+</p>
+<p>
+<center>
+	<a href="https://github.com/dshifflet/CodeExamplesFromBlog/tree/master/OdpNetCoreExampleNhWithTests">Example Code Here</a><br/>			
+</center>
+</p>
+			<br/><br/>
+			<div id="disqus_thread" data-disqus-identifier="20180326"></div>
+
+		  </div> <!-- /.blog-post -->		  
