@@ -1,0 +1,281 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">C#, WebAssembly and Zork</h2>
+            <p class="blog-post-meta">
+				March 17, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180325.html#disqus_thread"></a>
+			</p>
+<p><center>
+<img src="images/20180325/4.png"/><br/><br/>
+<a href="https://github.com/dshifflet/WasmZork">Example Code Here</a><br/>
+<a href="http://dshifflet.com/blog/zork">Demo Here</a>
+</center></p>			
+<h2>The Idea</h2>
+<p>	
+I decided to try out using Ooui which is a framework for creating WebAssemblies using C# and Xamarin Forms.  You can learn about it here <a href="https://github.com/praeclarum/Ooui">https://github.com/praeclarum/Ooui</a> and at <a href="http://praeclarum.org/post/171899388348/oouiwasm-net-in-the-browser">http://praeclarum.org/post/171899388348/oouiwasm-net-in-the-browser</a>.  The general idea is write C# and compile it to WebAssembly and run that in the browser instead of JavaScript.  I could have gone the <a href="https://github.com/aspnet/Blazor">Blazor</a> route, but my internet has been flaky and I didn't want to download the VS2017 preview release.
+</p>
+<p>
+After going thru the Ooui <a href="https://github.com/praeclarum/Ooui/wiki/Web-DOM-with-Web-Assembly">Getting Started</a>, I needed to make something.  WHAT?  I decided a text based game like <a href="https://en.wikipedia.org/wiki/Zork">Zork</a> would be nice.
+</p>
+<p><a href="https://en.wikipedia.org/wiki/Zork">Zork</a> is a text based piece of interactive fiction made by Infocom.  <a href="https://en.wikipedia.org/wiki/Zork">Zork</a> is inspired by Collosal Cave a game written in Fortran for DEC computers.  Selling games for DEC computers didn't make a lot of sense, so Infocom decided to create a virtual machine called ZMachine.  This ZMachine would let them use the same code (image) across multiple platforms.  Back in the day these platforms were personal computers like the C64, IBM, Apple II and lots of others.
+</p>
+<p>Zork appears to be abandonware and is freely distributable at a <a href="https://www.google.com/search?client=firefox-b-1&q=zork+1+abandonware">lot of sites</a>.  There are a lot of unofficial versions, including this one.
+<a name="endsummary"/>
+<h2>Starting to Code</h2>
+<p>
+Naturally I didn't want to spend a lot of time creating my own ZMachine thus I googled and I found this <a href="https://github.com/Adeimantius/Z-Machine">Adeimantius Z-Machine</a>.  Downloaded it and ported it over to .Net core which was super simple.  Ran it as a console app and it worked!  I knew at some point I would need HTML DOM elements talking to this thing so I was going to need to change it.
+<ul>
+<li>
+First problem for my grand scheme, ZMachine was getting the machine image (the game) from the file system.  WebAssembly can't access the filesystem.  I then proceeded to create a resource generator that would create a Csharp class that would represent the byte array of that file.  That is the ResourceGenerator in the tools, it takes binary files and generates a cs file that has a byte array that represents the content.  Basically the "image" <b>Zork1.dat</b> becomes <b>Zork1.cs</b> with a <b>public static byte[] GetData()</b>.
+</li>
+<li>
+All of the input and output was Console.Reads and Console.Writes, that wouldn't work if I had HTML DOM elements talking to the thing.  I thought about this and I decided to focus on making the thing testable.  That is where the changes from this <a href="https://github.com/dshifflet/WasmZork/commit/de2563bfc213c3a4c72611f216c9babcb45c8f34">commit</a> came from.  Look at the zmachine.Tests.BasicTests file and you will see a PlayZork test.
+<code><pre>
+namespace zmachine.Tests
+{
+    public class BasicTests
+    {
+        private readonly ITestOutputHelper _output;
+
+        public BasicTests(ITestOutputHelper output)
+        {
+            _output = output;
+        }
+
+        [Fact]
+        public void PlayZork()
+        {
+            var io = new SimpleInputOutput();
+            var machine =  new Machine(Zork1.GetData(), io);
+            WaitForOutput(machine, io);
+            Assert.True(ProcessCommand(machine, io, "look").Contains("West of House"));
+            Assert.True(ProcessCommand(machine, io, "open mailbox").Contains("leaflet"));
+            Assert.True(ProcessCommand(machine, io, "read leaflet").Contains("(Taken)"));
+            Assert.True(ProcessCommand(machine, io, "inventory").Contains("A leaflet"));
+        }
+
+        private string ProcessCommand(Machine machine, SimpleInputOutput io, string text)
+        {
+            io.Output = "";
+            io.WaitingForInput = false;
+            _output.WriteLine(">{0}", text);
+            machine.processText(text);
+            return WaitForOutput(machine, io);
+        }
+
+        private string WaitForOutput(Machine machine, SimpleInputOutput io)
+        {
+            while (!io.WaitingForInput && !machine.isFinished())
+            {
+                machine.processInstruction();
+            }
+            _output.WriteLine(io.Output.Substring(0, io.Output.Length-1));
+            return io.Output;
+        }
+
+    }
+}
+
+</code></pre>
+</li>
+</ul>
+</p>
+<p>
+Now I figured if I could test the thing,  I could use the Ooui to make it work in a web browser.
+</p>
+<h2>To the WebAssembly, Let's go!</h2>
+<p>
+<b><i>OOUI is in its infancy and changes fast.  The problems I am pointing out here are probably already fixed.  I was using 0.8.186</i></b>
+<p>
+<p>
+Time to wire it up to the Ooui.  I added a new tool called the OouiConsole under tools.  And this is the content of that Program.cs.
+<pre><code>
+using System;
+using Ooui;
+using WebAssembly;
+using zmachine;
+using ZorkConsole;
+
+namespace OouiConsole
+{
+    class Program
+    {
+        /* TO RUN THIS LOOK IN THE FOLLOWING FOLDER...
+         * tools\OouiConsole\bin\Debug\netcoreapp2.0\dist
+         * Load the index.html in a web browser.  It compiles down to a WASM.
+         */
+        private static Span _area;
+        
+        static void Main()
+        {
+            //Start Game
+            var io = new SimpleInputOutput();
+            var machine = new Machine(Zork1.GetData(), io);
+
+            _area = new Span();
+
+            var frm = new Form();
+
+            var textInput = new TextInput();
+
+            _area.Text = "";
+
+            frm.Submit += (sender, eventArgs) =>
+            {
+                DisplayOutput(ProcessCommand(machine, io, textInput.Value));
+                textInput.Value = ""; //DOESN'T WORK RIGHT
+                //value doesn't change so...
+                var js = string.Format("document.getElementById(\"{0}\").value = \"\";window.scrollTo(0,document.body.scrollHeight);", textInput.Id);
+                Runtime.InvokeJS(js);
+            };
+            var container = new Paragraph();
+            var p1 = new Paragraph();
+            var p2 = new Paragraph();
+
+            p1.AppendChild(_area);
+            frm.AppendChild(textInput);
+            p2.AppendChild(frm);
+
+            container.AppendChild(p1);
+            container.AppendChild(p2);
+                     
+            // Publish a root element to be displayed
+            UI.Publish("/", container);
+            DisplayOutput(WaitForOutput(machine, io));
+        }
+
+        private static string ProcessCommand(Machine machine, SimpleInputOutput io, string text)
+        {
+            io.Output = "";
+            io.WaitingForInput = false;
+            var p = new Paragraph {Text = string.Format(">{0}", text.Replace("\r\n", "<br/>"))};
+            _area.AppendChild(p);
+            machine.processText(text);
+            return WaitForOutput(machine, io);
+        }
+
+        private static string WaitForOutput(Machine machine, SimpleInputOutput io)
+        {
+            if (machine.isFinished())
+            {
+                return "Game crashed.  Refresh to start over, and don't do that again.";
+            }
+            while (!io.WaitingForInput && !machine.isFinished())
+            {
+                machine.processInstruction();
+            }
+            return io.Output;
+        }
+
+        private static void DisplayOutput(string s)
+        {
+            var stringSeparators = new[] { Environment.NewLine };
+            var lines = s.Substring(0, s.Length - 1).Split(stringSeparators, StringSplitOptions.None);
+            foreach (var line in lines)
+            {
+                var p = new Paragraph(line);
+                _area.AppendChild(p);
+            }
+        }
+    }
+}
+</code></pre>
+Basically I have a form containing a TextArea called <b>_area</b> and a TextField (Input with the type of text) called <b>textInput</b>.
+</p>
+<p>
+So what problems did I have now?
+</p>
+<p>
+<ul>
+<li>
+At first I wanted to detect the Enter from KeyPress on the text field.  That kind of worked.  Doing it off the form submit worked all the time.
+</li>
+<li>
+Once the form was submitted I wanted to clear out the text field.  But this did not work <b>textInput.Value = "";</b>.<br/>From reading I think the goal of the Ooui project isn't for standalone WASM apps, but combining a server that manages the shadow state. Which is cool!  But not what I wanted.  I tried a lot of dumb things here, until I realized I could just execute some javascript to clear the value out.
+</li>
+<li>
+I wanted the TextArea to scroll to the bottom when a command was submitted in the TextField.  Going to need some javascript.
+<code><pre>
+var js = string.Format("document.getElementById(\"{0}\").value = 
+  \"\";window.scrollTo(0,document.body.scrollHeight);", textInput.Id);
+Runtime.InvokeJS(js);
+</code></pre>
+That Javascript also clears out the TextField value.
+</li>
+</ul>
+Finally it all seemed to be wired up.  When you run the OouiConsole application it will open a console window.  This is not what you want to do.  When you build, it will compile and generate the WebAssembly stuff for you in the build path aka <b>tools\OouiConsole\bin\Debug\netcoreapp2.0\dist</b>.  There will be an <b>index.html</b> there.  Open that in a web browser and it will work.
+<br/><br/>
+<center>
+<img src="images/20180325/1.png"/>
+</center>
+</p>
+<h2>Time to make it look nicer!</h2>
+<p>
+I took the contents of the dist directory and added some CSS to it.
+<code><pre>
+body { background-color: black; color: springgreen; font-family: "Lucida Console"; }
+input { background-color: black; color: springgreen; font-family: "Lucida Console"; }
+</code></pre>
+I also added some extra text so it looks like.<br/><br/>
+<center>
+<img src="images/20180325/2.png"/>
+<br/>
+<i>Be careful.  If you are editting the html to make it prettier, when you build it rebuilds the index.html.  So keep copies.</i>
+</center>
+</p>
+<h2>Deployment</h2>
+<p>
+Everything for the WebAssembly is just static pages,  I should be able to push this up to my website hosted via Azure and it will be available for the world!  I did just that, went there with my browser but it didn't work.
+</p>
+<p>I got an error in my console.
+<center>
+<img src="images/20180325/3.png"/>
+</center>
+</p>
+<p>
+I noticed it said "has unsupported MIME type", I figured the problem here was that the server didn't know the mime type for the <b>.wasm</b> files.  I added a <b>web.config</b> to the folder and pushed again.
+<code><pre>
+&lt;configuration&gt;
+   &lt;system.webServer&gt;
+      &lt;staticContent&gt;
+         &lt;remove fileExtension=".wasm"/&gt;
+         &lt;mimeMap fileExtension=".wasm" mimeType="application/wasm" /&gt;
+      &lt;/staticContent&gt;
+   &lt;/system.webServer&gt;
+&lt;/configuration&gt;
+</code></pre>
+</p>
+<p>And problem solved!</p>
+<h2>Finally</h2>
+<p>It's available <a href="https://dshifflet.com/blog/zork">here</a>.</p>
+<p>This is literally C# compiled down to WebAssembly and running in your browser.  There is a very small amount of HTML and Javascript.  Almost none.  That is <u>NUTS</u>!</p>
+<p>Maybe once my internet stops flaking out I will try to port this over to Blazor.
+</p>
+<p>
+I wish I had a chance to try out the Xamarin Forms.  The Ooui website has demos of them.  They look very interesting.
+</p>
+<p>
+There appears to be support for the Canvas element.  I definitely need to look into that.  I wonder how different the implementation is versus System.Drawing?
+</p>
+<p><center>
+<a href="https://github.com/dshifflet/WasmZork">Example Code Here</a><br/>
+<a href="http://dshifflet.com/blog/zork">Demo Here</a>
+</center></p>
+<h2>Tips</h2>
+<ul>
+<li>
+<p>
+I did have some problems when building the OouiConsole application.  If you get an error like.
+</p>
+<p>
+<b>Could not find a part of the path 'C:\Users\something\AppData\Local\Temp\mono-wasm-ddf4e7be31b\bcl\Facades'.	OouiConsole	C:\Users\something\.nuget\packages\ooui.wasm\0.8.186\build\netstandard2.0\Ooui.Wasm.targets	17
+</b></p>
+<p>
+Delete that directory, aka <b>C:\Users\something\AppData\Local\Temp\mono-wasm-ddf4e7be31b</b>.  When it builds it will recreate it.  That's the build resources it uses to create the WebAssembly stuff.</p>
+</li>
+<li>You can't debug, so no break points with Ooui in your C#.  But <b>Console.WriteLine()</b> this will write to the console in the Web Developer Tools in most browsers. I believe that <b>Console.ReadLine()</b> will also work via the console.</li>
+</ul>
+</p>
+			<br/><br/>
+			<div id="disqus_thread" data-disqus-identifier="20180325"></div>
+
+		  </div> <!-- /.blog-post -->		  
