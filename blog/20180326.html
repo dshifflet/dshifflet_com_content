@@ -65,7 +65,7 @@ namespace Northwind.Mappings
 {
 
     //NHIBERNATE MAPPING
-    internal class ProductsMapping : ClassMapping<Product>
+    internal class ProductsMapping : ClassMapping&lt;Product&gt;
     {
         public ProductsMapping()
         {
@@ -114,7 +114,7 @@ namespace Northwind
     {
         public static HbmMapping[] HbmMappings { get; private set; }
 
-        public static ISessionFactory CreateNhSessionFactory<TDialect, TDriver>(string connectionString, Assembly[] assemblies = null, bool showSql = true) 
+        public static ISessionFactory CreateNhSessionFactory&lt;TDialect, TDriver&gt;(string connectionString, Assembly[] assemblies = null, bool showSql = true) 
             where TDialect : Dialect
             where TDriver : IDriver
         {
@@ -124,13 +124,13 @@ namespace Northwind
             }
 
             var nhConfiguration = new Configuration();
-            nhConfiguration.Cache(properties => properties.Provider<HashtableCacheProvider>());
+            nhConfiguration.Cache(properties => properties.Provider&lt;HashtableCacheProvider&gt;());
 
             nhConfiguration.DataBaseIntegration(dbi =>
             {
-                dbi.Dialect<TDialect>();
-                dbi.Driver<TDriver>();
-                dbi.ConnectionProvider<DriverConnectionProvider>();
+                dbi.Dialect&lt;TDialect&gt;();
+                dbi.Driver&lt;TDriver&gt;();
+                dbi.ConnectionProvider&lt;DriverConnectionProvider&gt;();
                 dbi.IsolationLevel = IsolationLevel.ReadCommitted;
                 dbi.ConnectionString = connectionString;
                 dbi.Timeout = 60;
@@ -180,7 +180,7 @@ namespace Northwind
                     .MakeGenericMethod(t).Invoke(mapper, null);
             }
 
-            var mappings = new List<ModelMapper>
+            var mappings = new List&lt;ModelMapper&gt;
                            {
                                mapper
                            };
@@ -193,9 +193,9 @@ namespace Northwind
             HbmMappings = hibernateMappings;
         }
 
-        public static IEnumerable<Type> GetMappings(IEnumerable<Assembly> assemblies)
+        public static IEnumerable&lt;Type&gt; GetMappings(IEnumerable&lt;Assembly&gt; assemblies)
         {
-            var result = new List<Type>();
+            var result = new List&lt;Type&gt;();
             foreach (var assembly in assemblies)
             {
                 result.AddRange(assembly.GetTypes()
@@ -272,7 +272,7 @@ namespace OdpNetCoreExample
 //var query = db.Product.Where(o => o.Id > 25).OrderByDescending(o=>o.ProductName)  
 //.ToList();
 //to...
-                    var query = session.Query<Product>().Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
+                    var query = session.Query&lt;Product&gt;().Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
                         .ToList();
 //So it's very similar.
                     foreach (var item in query.ToList())
@@ -325,7 +325,7 @@ namespace Northwind.Tests
         public NorthwindDbFixture()
         {
             //DataSource=:memory: makes Sqlite use in memory     
-            SessionFactory = NhFactory.CreateNhSessionFactory<SQLiteDialect, MicrosoftDataSqliteDriver> ("DataSource=:memory:");
+            SessionFactory = NhFactory.CreateNhSessionFactory&lt;SQLiteDialect, MicrosoftDataSqliteDriver&gt; ("DataSource=:memory:");
 
             using (var sr = new StreamReader("build_northwind.sql"))
             {
@@ -382,11 +382,11 @@ namespace Northwind.Tests
     public class MicrosoftDataSqliteDriver : ReflectionBasedDriver
     {
         /// <summary>
-        /// Initializes a new instance of <see cref="Microsoft.Data.Sqlite"/>.
+        /// Initializes a new instance of &lt;see cref="Microsoft.Data.Sqlite"/&gt;.
         /// </summary>
-        /// <exception cref="HibernateException">
-        /// Thrown when the <c>Microsoft.Data.Sqlite</c> assembly can not be loaded.
-        /// </exception>
+        /// &lt;exception cref="HibernateException"&gt;
+        /// Thrown when the Microsoft.Data.Sqlite assembly can not be loaded.
+        /// &lt;/exception&gt;
         public MicrosoftDataSqliteDriver()
             : base(
                 "Microsoft.Data.Sqlite",
@@ -414,7 +414,7 @@ using Xunit.Abstractions;
 
 namespace Northwind.Tests
 {
-    public class BasicTests : IClassFixture<NorthwindDbFixture>
+    public class BasicTests : IClassFixture&lt;NorthwindDbFixture&gt;
     {
         //this is to display some output about the counts
         private readonly ITestOutputHelper _output;
@@ -431,7 +431,7 @@ namespace Northwind.Tests
         {
             using(var session = _fixture.OpenSession())
             {
-                var query = session.Query<Product>().Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
+                var query = session.Query&lt;Product&gt;().Where(o => o.Id > 25).OrderByDescending(o => o.ProductName)
                     .ToList();
                 _output.WriteLine("Products: {0}", query.Count);
                 Assert.True(query.Any());
@@ -443,7 +443,7 @@ namespace Northwind.Tests
         {
             using (var session = _fixture.OpenSession())
             {
-                var query = session.Query<Product>().Where(o => o.UnitPrice < 20).OrderByDescending(o => o.ProductName)
+                var query = session.Query&lt;Product&gt;().Where(o => o.UnitPrice < 20).OrderByDescending(o => o.ProductName)
                     .ToList();
                 Assert.True(query.Any());
             }
@@ -456,7 +456,7 @@ namespace Northwind.Tests
 So not a lot of changes here.  We are basically using the fixture directly instead of the Setup like in the Linq2Db example.
 </p>
 <p>
-Our basic querying has changed from <b>db.Product.Where(o => o.Id > 25)</b> in Linq2Db to <b>session.Query<Product>().Where(o => o.UnitPrice < 20)</b> with NHibernate.  The contents of the where remains the same.
+Our basic querying has changed from <b>db.Product.Where(o => o.Id > 25)</b> in Linq2Db to <b>session.Query&lt;Product&gt;().Where(o => o.Id > 25)</b> with NHibernate.  The contents of the where remains the same.
 </p>
 <p>
 I am not using transactions here, because this is read only.  But maybe I should be?
