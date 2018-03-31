@@ -7,9 +7,21 @@
 	 <script src="no_jquery.js"></script> 
 	 <script src="gauges.js"></script>
 	<script>
-
 		ready(function() {
-			var flow = new gauges.gauge("FLOW",270,180,0,350,3, 
+			redraw();
+		});
+				
+		window.addEventListener("resize", function(event){	
+		  document.getElementById("FLOW").innerHTML = "";
+		  redraw();
+		});				
+				
+		redraw = function() {
+			document.getElementById("FLOW").style.width = 
+				document.getElementById("FLOW").clientHeight;
+		
+
+			var flow = new gauges.gauge("FLOW",0,270,0,350,3, 
 			  new gauges.gaugeTitle("STREAM FLOW", "GPH"),
 			[ 
 				new gauges.gaugeTick(50,1,15,true),
@@ -17,64 +29,67 @@
 			  	new gauges.gaugeTick(5,1,5,false) 
 			],
 			[
-				new gauges.gaugeShade("green", 91,236,7),
-				new gauges.gaugeShade("red", 236,350,7),
-				new gauges.gaugeShade("white", 64,130,3)
-			],
-			[
-				new gauges.gaugeNeedle(new gauges.needlePainters.lineNeedle(), "blue", 95, 2, 0),
-				new gauges.gaugeNeedle(new gauges.needlePainters.pointyNeedle(), "orange", 95, 2, 10)
-				new gauges.gaugeNeedle(new gauges.needlePainters.longPointyNeedle(), "AntiqueWhite", 80, 2, 200),
-				new gauges.gaugeNeedle(new gauges.needlePainters.markerNeedle(), "yellow", 95, 35, 305),								
-			]);
-			
-			var flow2 = new gauges.gauge("FLOW2",0,270,0,350,3, 
-			  new gauges.gaugeTitle("STREAM FLOW", "GPH"),
-			[ 
-				new gauges.gaugeTick(50,1,15,true),
-			  	new gauges.gaugeTick(25,1,10,false), 
-			  	new gauges.gaugeTick(5,1,5,false) 
-			],
-			[
-				new gauges.gaugeShade("white", 64,130,9),
-				new gauges.gaugeShade("green", 91,236,7),
-				new gauges.gaugeShade("red", 236,350,7)				
+				new gauges.gaugeShade("white", 60,130,9),
+				new gauges.gaugeShade("green", 90,230,7),
+				new gauges.gaugeShade("red", 230,350,7)				
 			],
 			[
 				new gauges.gaugeNeedle(new gauges.needlePainters.lineNeedle(), "blue", 95, 2, 150),
 				new gauges.gaugeNeedle(new gauges.needlePainters.pointyNeedle(), "orange", 95, 2, 100),			
 				new gauges.gaugeNeedle(new gauges.needlePainters.longPointyNeedle(), "AntiqueWhite", 80, 2, 200),
 				new gauges.gaugeNeedle(new gauges.needlePainters.markerNeedle(), "yellow", 95, 35, 305),				
-			]);			
+			]);		
+			
 			flow.paint();		
-			flow2.paint();	
 
-			//move the needle from 0 to 350 over 30 seconds...
-			animate(flow2, 1, 50, 0, 350, 30);			
-		});
+			//move the needles
+			animate(flow, 0, 50, 20, 125, 5);
+			animate(flow, 1, 50, 0, 350, 15);
+			animate(flow, 2, 50, 150, 250, 30);
+			animate(flow, 3, 50, 275, 305, 5);			
+		}
 		
 		animate = function(gauge, idx, refreshMs, start, end, totalTime) {			
 			var elapsed = 0;			
-			var animation = setInterval(function() {
+			var direction = 1;
+			
+			var animation = setInterval(function() {				
 				var elapsedSeconds = elapsed / 1000;
 				if(elapsedSeconds>totalTime) {
 					//Animation is done restart it...
 					elapsed = 0;
 					//stop it...  clearInterval(animation);
+					if(direction===1) {
+						direction = -1;
+					}
+					else {
+						direction = 1;
+					}
 				}			
+				var resolution = 0;
+				var value = 0;
 				
-				var resolution = (end - start) / totalTime;
-				var value = resolution * (elapsed/1000);				
+				//makes it bouncy
+				if(direction===1){
+					resolution = (end - start) / totalTime;
+					value = start + resolution * elapsed/1000;
+				}
+				else {
+					resolution = (start - end) / totalTime;
+					value = end + resolution * elapsed/1000;
+				}
+											
 				gauge.needles[idx].value = value;
 				gauge.paint();
 				elapsed += refreshMs;				
-			}, refreshMs);		
+			}, refreshMs);			
 		};
 		
 	</script>
 	</head>
 	<body style="background-color:black;">
-		<div id="FLOW" style="height:300px;width:300px;background-color:black;color:white;position:absolute;z-index:5;top:0;left:5;"></div>
-		<div id="FLOW2" style="height:300px;width:300px;background-color:black;color:white;position:absolute;z-index:10;top:200;left:5;"></div>
+		<center>
+			<div id="FLOW" style="height:100%;width:300;background-color:black;color:white;position:absolute;z-index:5;top:0;left:5;"></div>
+		</center>
 	</body>
 </html>
