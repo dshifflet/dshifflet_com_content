@@ -17,10 +17,18 @@
 		});				
 				
 		redraw = function() {
-			document.getElementById("FLOW").style.width = 
-				document.getElementById("FLOW").clientHeight;
 		
-
+			var size = document.body.clientHeight;
+			var offset = 5;
+			if(size>=document.body.clientWidth) {
+				size = document.body.clientWidth;
+			}
+			
+			document.getElementById("FLOW").style.width = 
+				size - offset;
+			document.getElementById("FLOW").style.height = 
+				size - offset;							
+		
 			var flow = new gauges.gauge("FLOW",0,270,0,350,3, 
 			  new gauges.gaugeTitle("STREAM FLOW", "GPH"),
 			[ 
