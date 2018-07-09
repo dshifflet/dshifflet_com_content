@@ -1,0 +1,234 @@
+          <div class="blog-post">		  
+            <h2 class="blog-post-title">End to End Tests for HttpClient</h2>
+            <p class="blog-post-meta">
+				July 8, 2018 by <a href="../index.html">David Shifflet</a> - 
+				<a href="http://www.dshifflet.com/blog/20180708.html#disqus_thread"></a>
+			</p>
+<p>
+A lot of applications have something like this in them:
+<pre><code>
+    public class SomeBusinessService
+    {
+        public void DoTheBusiness(object o)
+        {
+            DoBusiness();
+
+            using (var httpClient = new HttpClient())
+            using (var response = httpClient.GetAsync(Settings.Default.SomeUrl).Result)
+            using (var content = response.Content)
+            {
+                //Call out and based on the return do something
+                DoMoreBusiness(content.ReadAsStringAsync().Result);
+            }
+        }
+    }
+</pre></code>
+</p>
+<p>
+So what is the problem with that code?  First I can't inject a mock for the HttpClient it is concrete.  I can't really change the setting for the "SomeUrl" property, and nine times out of 10 that is an ApplicationSettings (You can change user settings easily but not application settings).
+</p>
+<p>
+What to do when we are faced with this problem?
+</p>
+<a name="endsummary"/>
+<p>
+	<b><center><a href='https://github.com/dshifflet/TestHttpServer'>Example Code</a></center></b>
+</p>
+<h2>The Simple Http Server</h2>
+<p>
+What we are going to do is to bring up a simple HttpServer using HttpListener.  We are going to register our routes with it and define what it should return.  Then we can run code via our tests and the code is going to talk to our HttpServer a fake one and not the real one.
+</p>
+<h2>Application Settings... Why?</h2>
+<p>
+But what about changing the expected URL that is probably in some ApplicationSetting?  I know I just wrote you can't change that... but you can change it like this:
+</p>
+<p>
+First change the AssemblyInfo.cs for the namespace and add this:
+<pre><code>
+[assembly: InternalsVisibleTo("Your.Test.Namespace")]
+</pre></code>
+Now we can see the settings from our Test.  Now in the test do this:
+<pre><code>
+	Properties.Settings.Default.Reload(); //Reload because other tests might have changed it.
+	var dummy = Properties.Settings.Default.SomeUrl; //This forces a refresh.  Looks odd, but you need it.
+	Properties.Settings.Default.PropertyValues["SomeUrl"].PropertyValue = url; //Finally set the new value
+</pre></code>
+Not pretty.  But with that out of the way we can change any application setting in our tests!
+</p>
+<h2>HTTP Server Code</h2>
+<p>
+How do we bring up this HttpServer?  Copy paste this content or get it from <a href='https://github.com/dshifflet/TestHttpServer/blob/master/main/HttpServer/HttpServer.cs'> dshifflet git hub</a> into your TestProject.  You are going to want a copy for your tests causes you might need to expand on it.
+<pre><code>
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace HttpServer
+{
+    public class HttpServer : IDisposable
+    {
+        private CancellationToken _cancelToken;
+
+        public HttpServer(string url, IEnumerable<RouteUrl> testRoutes, int maxConcurrentRequests = 10)
+        {
+            _cancelToken = new CancellationToken();
+            Task.Run(() =>
+            {
+                Listen(url, maxConcurrentRequests, _cancelToken, testRoutes).Wait();
+            });
+        }
+
+        public static string GetLocalhostAddress()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return $"http://localhost:{port}/";
+        }
+
+        public async Task Listen(string prefix, int maxConcurrentRequests, CancellationToken token,
+            IEnumerable<RouteUrl> endPoints)
+        {
+            var routedEndPoints = endPoints.ToArray();
+
+            HttpListener listener = new HttpListener();
+            listener.Prefixes.Add(prefix);
+            listener.Start();
+
+            var requests = new HashSet<Task>();
+            for (int i = 0; i < maxConcurrentRequests; i++)
+                requests.Add(listener.GetContextAsync());
+
+            while (!token.IsCancellationRequested)
+            {
+                var t = await Task.WhenAny(requests);
+                requests.Remove(t);
+
+                if (t is Task<HttpListenerContext>)
+                {
+                    var context = (t as Task<HttpListenerContext>).Result;
+                    requests.Add(ProcessRequestAsync(context, routedEndPoints));
+                    requests.Add(listener.GetContextAsync());
+                }
+            }
+        }
+
+        public async Task ProcessRequestAsync(HttpListenerContext context, IEnumerable<RouteUrl> endPoints)
+        {
+            var response = context.Response;
+            var stream = response.OutputStream;
+            var writer = new StreamWriter(stream);
+//Expand on this here to do what you want.  We are looking for endpoints that match what has been called.  URL and Method are the key.
+            var endPoint = endPoints.FirstOrDefault(o =>
+                o.Method.Equals(context.Request.HttpMethod, StringComparison.OrdinalIgnoreCase) &&
+                o.Url.Equals(context.Request.Url.ToString(), StringComparison.OrdinalIgnoreCase));
+            if (endPoint == null)
+            {
+                response.StatusCode = 404;
+            }
+            else
+            {
+                writer.Write(endPoint.Response);
+            }
+
+            writer.Close();
+        }
+
+        public void Dispose()
+        {
+            _cancelToken = new CancellationToken(true);
+        }
+    }
+
+    public class RouteUrl
+    {
+        public string Method { get; set; }
+        public string Url { get; set; }
+        public string Response { get; set; }
+
+        public RouteUrl(string method, string url, string response)
+        {
+            Method = method;
+            Url = url;
+            Response = response;
+        }
+    }
+}
+</pre></code>
+</p>
+<h2>The Test</h2>
+<p>
+Now we want to write a test with it.  That is going to look like:
+<pre><code>
+        [TestMethod]
+        public void CanGet()
+        {
+			//GetLocalHostAddress() will return a new port each time you call it.  So only call it once per test.  Put it in a variable.
+            var url = HttpServer.GetLocalhostAddress(); 
+			//Define the URL we want to map our response of "some html" to.
+            var destinationUrl = $"{url}test/test/test";
+            using (var server = new HttpServer(url,
+                new[]
+                {
+                    new RouteUrl("GET", destinationUrl, "some html") //Going to that URL should give the response "some html"
+                }
+                ))
+            {
+                Assert.IsTrue(GetContent(new Uri(destinationUrl)).Contains("some html"));
+            }
+        }
+		
+        private string GetContent(Uri page)
+        {
+            using (var httpClient = new HttpClient())
+            using (var response = httpClient.GetAsync(page).Result)
+            using (var content = response.Content)
+            {
+                return content.ReadAsStringAsync().Result;
+            }
+        }		
+</pre></code>
+So we are creating a new HttpServer and giving it a collection of methods (POST, GET, etc.) and URLs with the related response. So when our HttpServer is hit with the related method and URL it should give back the related response.
+</p>
+<p>
+Keep in mind the response is strings, but it would be easy to change it and extend this.  The magic happens in the HttpServer code around the method <b>ProcessRequestAsync(...)</b>.  You could even improve the thing to handle dealing with Funcs based on routes.  Your imagination is the limit.
+</p>
+<h2>WHAT NOT TO DO!</h2>
+<p>
+<b>
+Don't use this as some full blown HTTP server it's meant for just faking one side of the HTTP communication.
+</b>
+</p>
+<h2>What to Do in the Future (How to avoid having to do this!)</h2>
+<p>
+	<ul>
+		<li>AppSettings are great, but wrap them in a ConfigService and inject that into the constructor via DI.  A lot easier and cleaner in the tests if you need to change settings.</li>
+		<li>Don't use the concrete HttpClient in your services.  Wrap it as a client while implementing an interface and inject that interface via the constructor.  That way you can mock the client, and avoid the need for this.</li>
+		<li>If you are using HttpClient like this.  BEWARE!  Read This: <a href='https://aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/'>https://aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/</a></li>
+	</ul>
+</p>
+<h2>Summary</h2>
+<p>
+In the case of brownfield applications and you just need some tests, this will get you going without a refactor.
+</p>
+<p>
+It might also be useful if you are calling into something else and you need to support the server side of the HTTP communication and don't have the ability to refactor the client side code and you need a test around it.
+<br/>
+<center><b><i>Keep on Testing!</i></b></center>
+</p>
+<h2>Links</h2>
+<p>
+	<ul>
+		<li><a href='https://github.com/dshifflet/TestHttpServer'>Example Code</a></li>
+	</ul>
+</p>
+			<br/><br/>
+			<div id="disqus_thread" data-disqus-identifier="20180708"></div>
+		  </div> <!-- /.blog-post -->		  
