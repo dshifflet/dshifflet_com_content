@@ -75,7 +75,7 @@ namespace HttpServer
     {
         private CancellationToken _cancelToken;
 
-        public HttpServer(string url, IEnumerable<RouteUrl> testRoutes, int maxConcurrentRequests = 10)
+        public HttpServer(string url, IEnumerable&lt;RouteUrl&gt; testRoutes, int maxConcurrentRequests = 10)
         {
             _cancelToken = new CancellationToken();
             Task.Run(() =>
@@ -94,7 +94,7 @@ namespace HttpServer
         }
 
         public async Task Listen(string prefix, int maxConcurrentRequests, CancellationToken token,
-            IEnumerable<RouteUrl> endPoints)
+            IEnumerable&lt;RouteUrl&gt; endPoints)
         {
             var routedEndPoints = endPoints.ToArray();
 
@@ -102,8 +102,8 @@ namespace HttpServer
             listener.Prefixes.Add(prefix);
             listener.Start();
 
-            var requests = new HashSet<Task>();
-            for (int i = 0; i < maxConcurrentRequests; i++)
+            var requests = new HashSet&lt;Task&gt;();
+            for (int i = 0; i &lt; maxConcurrentRequests; i++)
                 requests.Add(listener.GetContextAsync());
 
             while (!token.IsCancellationRequested)
@@ -111,16 +111,16 @@ namespace HttpServer
                 var t = await Task.WhenAny(requests);
                 requests.Remove(t);
 
-                if (t is Task<HttpListenerContext>)
+                if (t is Task&lt;HttpListenerContext&gt;)
                 {
-                    var context = (t as Task<HttpListenerContext>).Result;
+                    var context = (t as Task&lt;HttpListenerContext&gt;).Result;
                     requests.Add(ProcessRequestAsync(context, routedEndPoints));
                     requests.Add(listener.GetContextAsync());
                 }
             }
         }
 
-        public async Task ProcessRequestAsync(HttpListenerContext context, IEnumerable<RouteUrl> endPoints)
+        public async Task ProcessRequestAsync(HttpListenerContext context, IEnumerable&lt;RouteUrl&gt; endPoints)
         {
             var response = context.Response;
             var stream = response.OutputStream;
